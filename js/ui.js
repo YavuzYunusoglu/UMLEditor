@@ -95,11 +95,17 @@
   /* ---------- Menüler ---------- */
   let openMenus = [];
   function closeMenus() { openMenus.forEach((m) => m.remove()); openMenus = []; document.querySelectorAll('.tb-btn.open').forEach((b) => b.classList.remove('open')); }
+  function closeDeeper(level) {
+    openMenus.filter((m) => +m.dataset.level > (level || 0)).forEach((m) => m.remove());
+    openMenus = openMenus.filter((m) => m.isConnected);
+  }
 
   function showMenu(x, y, items, opts) {
     opts = opts || {};
     if (!opts.sub) closeMenus();
-    const openedAt = opts.sub ? 0 : performance.now();
+    const openedAt = performance.now();
+    // kök menü: uzun basıştan kalkan parmak; alt menü: onu açan dokunuşun gecikmeli click'i
+    const clickGuard = opts.sub ? 300 : 450;
     const menu = h('div', { class: 'menu', role: 'menu' });
     for (const it of items) {
       if (!it) continue;
@@ -113,28 +119,41 @@
       if (it.checked) row.querySelector('.menu-ico').innerHTML = '<span class="dot"></span>';
       if (it.submenu) {
         let child = null;
-        row.addEventListener('mouseenter', () => {
-          openMenus.filter((m) => m.dataset.level > (opts.level || 0)).forEach((m) => m.remove());
-          openMenus = openMenus.filter((m) => m.isConnected);
-          const r = row.getBoundingClientRect();
-          child = showMenu(r.right - 2, r.top - 5, it.submenu, { sub: true, level: (opts.level || 0) + 1 });
-        });
+        const openSub = () => {
+          if (child && child.isConnected) return;
+          closeDeeper(opts.level);
+          menu.querySelectorAll('.menu-item.open').forEach((x) => x.classList.remove('open'));
+          row.classList.add('open');
+          child = showMenu(0, 0, it.submenu, { sub: true, level: (opts.level || 0) + 1, anchor: row });
+        };
+        row.addEventListener('mouseenter', openSub);
+        // dokunmatikte mouseenter her zaman gelmez: dokunuşla da açılsın
+        row.addEventListener('click', (e) => { e.stopPropagation(); openSub(); });
       } else {
-        row.addEventListener('mouseenter', () => {
-          openMenus.filter((m) => +m.dataset.level > (opts.level || 0)).forEach((m) => m.remove());
-          openMenus = openMenus.filter((m) => m.isConnected);
-        });
+        row.addEventListener('mouseenter', () => { closeDeeper(opts.level); menu.querySelectorAll('.menu-item.open').forEach((x) => x.classList.remove('open')); });
         // uzun basışla açılan menüde parmak kalkınca altta kalan öğe "tıklanmasın"
-        if (!it.disabled) row.addEventListener('click', (e) => { e.stopPropagation(); if (performance.now() - openedAt < 450) return; closeMenus(); it.action && it.action(); });
+        if (!it.disabled) row.addEventListener('click', (e) => { e.stopPropagation(); if (performance.now() - openedAt < clickGuard) return; closeMenus(); it.action && it.action(); });
       }
       menu.appendChild(row);
     }
     menu.dataset.level = opts.level || 0;
     document.body.appendChild(menu);
     const r = menu.getBoundingClientRect();
+    const W = window.innerWidth, H = window.innerHeight;
     let left = x, top = y;
-    if (left + r.width > window.innerWidth - 6) left = opts.sub ? x - r.width - (opts.parentWidth || 200) : window.innerWidth - r.width - 6;
-    if (top + r.height > window.innerHeight - 6) top = Math.max(6, window.innerHeight - r.height - 6);
+    if (opts.anchor) {
+      // alt menü: üst menünün sağına, sığmazsa soluna; dar ekranda satırın altına/üstüne
+      const ar = opts.anchor.getBoundingClientRect(), pr = opts.anchor.closest('.menu').getBoundingClientRect();
+      top = ar.top - 5;
+      if (pr.right - 2 + r.width <= W - 6) left = pr.right - 2;
+      else if (pr.left + 2 - r.width >= 6) left = pr.left + 2 - r.width;
+      else {
+        left = Math.min(ar.left + 16, W - r.width - 6);
+        top = ar.bottom + 2 + r.height <= H - 6 ? ar.bottom + 2 : ar.top - r.height - 2;
+      }
+    } else if (left + r.width > W - 6) left = W - r.width - 6;
+    if (top + r.height > H - 6) top = H - r.height - 6;
+    top = Math.max(6, top);
     menu.style.left = Math.max(6, left) + 'px';
     menu.style.top = top + 'px';
     openMenus.push(menu);

@@ -189,6 +189,15 @@
 
   function onDown(e) {
     if (App.UI.topModal()) return;
+    // birincil işaretçi = ekrana ilk değen parmak; haritada kalanlar kaybolmuş pointerup'lardır
+    // (ör. uzun basışta dokunulan öğe yeniden çizimle DOM'dan silinince). Temizlenmezse
+    // sonraki tek parmak dokunuşu iki parmak (yakınlaştırma) sanılır.
+    if (e.isPrimary && (pointers.size || st)) {
+      pointers.clear();
+      clearTimeout(longTimer);
+      cancelInteraction();
+      wrap.classList.remove('panning');
+    }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
     if (isTouch !== touchMode) { touchMode = isTouch; wrap.classList.toggle('touch', isTouch); }

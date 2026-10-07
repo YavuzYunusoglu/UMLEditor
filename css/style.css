@@ -309,17 +309,17 @@ select.input { padding: 0 6px; cursor: pointer; }
 
 /* ============ Menü ============ */
 .menu {
-  position: fixed; z-index: 100; min-width: 200px; max-height: calc(100vh - 16px); overflow-y: auto; padding: 5px;
+  position: fixed; z-index: 100; min-width: 200px; max-width: calc(100vw - 12px); max-height: calc(100vh - 16px); overflow-y: auto; padding: 5px;
   background: var(--panel); border: 1px solid var(--border2); border-radius: 10px; box-shadow: var(--shadow);
   animation: pop .1s ease-out;
 }
 @keyframes pop { from { opacity: 0; transform: translateY(-3px) scale(.98); } }
 .menu-item { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 9px 0 7px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
-.menu-item:hover { background: var(--accent-weak); }
+.menu-item:hover, .menu-item.open { background: var(--accent-weak); }
 .menu-item.disabled { color: var(--text3); cursor: default; background: transparent; }
 .menu-ico { width: 16px; display: flex; justify-content: center; color: var(--text2); }
 .menu-ico .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.menu-label { flex: 1; }
+.menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .menu-kbd { color: var(--text3); font-size: 11.5px; margin-left: 18px; }
 .menu-sub { color: var(--text3); display: flex; }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
