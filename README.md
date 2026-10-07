@@ -290,6 +290,8 @@ The Google Cloud project, the Drive API and GitHub Pages are free; no billing ac
 
 ## Privacy
 
+See the full [Privacy Policy](privacy.html) and [Terms of Service](terms.html). Both are also linked from the app's status bar.
+
 - There is **no backend, analytics or tracking**. The app is a set of static files.
 - Your work is autosaved in your **browser's local storage** on each device.
 - Drive sync talks directly from your browser to Google, using the **`drive.file`** scope. With this scope, the app can only see files that it created itself; it cannot read anything else in your Drive. Files are stored in a **UML Studio** folder.

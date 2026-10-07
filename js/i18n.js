@@ -94,6 +94,8 @@
     'Görünüm': 'View',
     'Tekerlek': 'Wheel',
     'Yakınlaştır': 'Zoom in',
+    'Gizlilik': 'Privacy',
+    'Koşullar': 'Terms',
     'Boşluk + sürükle': 'Space + drag',
     'Kaydır': 'Pan',
     'Orta / sağ tık sürükle': 'Middle / right drag',

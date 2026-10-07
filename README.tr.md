@@ -292,6 +292,8 @@ Google Cloud projesi, Drive API ve GitHub Pages ücretsizdir; faturalandırma he
 
 ## Gizlilik
 
+Tam metinler: [Gizlilik Politikası](privacy.html) ve [Kullanım Koşulları](terms.html) (İngilizce). İkisi de uygulamanın alt durum çubuğundan açılabilir.
+
 - **Sunucu, analiz ya da takip yoktur.** Uygulama yalnızca statik dosyalardan oluşur.
 - Çalışmalarınız her cihazda **tarayıcının yerel depolamasına** otomatik kaydedilir.
 - Drive senkronu tarayıcınızdan doğrudan Google'a bağlanır ve **`drive.file`** iznini kullanır. Bu izinle uygulama yalnızca kendi oluşturduğu dosyaları görebilir; Drive'ınızdaki başka hiçbir şeyi okuyamaz. Dosyalar **UML Studio** klasöründe saklanır.
