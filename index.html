@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>UML Studio</title>
+  <meta name="theme-color" content="#181b21">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="UML Studio">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="description" content="Free, offline UML class diagram and flowchart editor with Unity shortcuts and C# import/export.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%235b8cff'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h12' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <script>
+    // tema yanıp sönmesini önle
+    try { var t = localStorage.getItem('umlstudio.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    // PWA manifest yalnızca http(s) üzerinde (file:// altında tarayıcı CORS hatası verir)
+    if (/^https?:$/.test(location.protocol)) { var m = document.createElement('link'); m.rel = 'manifest'; m.href = 'manifest.webmanifest'; document.head.appendChild(m); }
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Metinler Türkçe anahtarlardır; js/i18n.js seçilen dile çevirir (data-i18n*). -->
+  <header class="topbar">
+    <div class="brand" title="UML Studio">
+      <svg width="22" height="22" viewBox="0 0 32 32"><rect x="3" y="3" width="26" height="26" rx="7" fill="var(--accent)"/><path d="M9 11h14M9 16h10M9 21h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>
+      <span>UML Studio</span>
+    </div>
+    <input id="docName" class="doc-name" type="text" spellcheck="false" data-i18n-title="Belge adı" title="Belge adı">
+    <div class="tb-group">
+      <button class="tb-btn" id="btnFile"><span data-i18n>Dosya</span></button>
+      <button class="tb-btn accent" id="btnImport"><span class="ico-wrap"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span><span data-i18n>İçe Aktar</span></button>
+      <button class="tb-btn accent" id="btnExport"><span class="ico-wrap"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></span><span data-i18n>Dışa Aktar</span></button>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <button class="icon-btn" id="btnUndo" data-i18n-title="Geri al (Ctrl+Z)"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+      <button class="icon-btn" id="btnRedo" data-i18n-title="Yinele (Ctrl+Y)"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <button class="tb-btn" id="btnLayout" data-i18n-title="Otomatik yerleşim"><span class="ico-wrap"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-2h12v2"/></svg></span><span data-i18n>Yerleşim</span></button>
+      <button class="icon-btn" id="btnFit" data-i18n-title="Ekrana sığdır (Shift+1)"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/></svg></button>
+    </div>
+    <div class="spacer"></div>
+    <button class="tb-btn drive-btn off" id="btnDrive" title="Google Drive">
+      <svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4.5 4.5 0 0 1-.5 9.5z"/></svg>
+      <span class="drive-dot"></span><span class="drive-text">Drive</span>
+    </button>
+    <button class="cmd-trigger" id="btnCmd" data-i18n-title="Komut paleti (Ctrl+K)">
+      <svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>
+      <span data-i18n>Ara / ekle…</span><kbd>Ctrl K</kbd>
+    </button>
+    <button class="tb-btn lang-btn" id="btnLang" data-i18n-title="Dil / Language">
+      <svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+      <span class="lang-code">EN</span>
+    </button>
+    <button class="icon-btn" id="btnTheme"></button>
+    <button class="icon-btn" id="btnHelp" data-i18n-title="Klavye kısayolları (?)"><svg class="ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.2-2.4 3.8"/><path d="M12 17h.01"/></svg></button>
+  </header>
+
+  <main class="main">
+    <aside class="palette" id="palette">
+      <div class="palette-search">
+        <svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>
+        <input id="paletteSearch" type="search" data-i18n-placeholder="Şekil / şablon ara…" spellcheck="false">
+      </div>
+      <div class="palette-body" id="paletteBody"></div>
+    </aside>
+
+    <section class="center">
+      <div class="tabbar">
+        <button class="icon-btn small" id="togglePalette" data-i18n-title="Paleti gizle/göster"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
+        <div class="tab-list" id="tabList"></div>
+        <button class="icon-btn small" id="tabAdd" data-i18n-title="Yeni sekme"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <div class="spacer"></div>
+        <button class="icon-btn small" id="togglePanel" data-i18n-title="Paneli gizle/göster"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap" tabindex="-1">
+        <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+          <g id="viewport">
+            <g id="layer-frames"></g>
+            <g id="layer-edges"></g>
+            <g id="layer-nodes"></g>
+            <g id="layer-labels"></g>
+            <g id="layer-overlay"></g>
+          </g>
+        </svg>
+        <textarea id="inlineEditor" class="inline-editor" spellcheck="false"></textarea>
+        <div class="empty-hint">
+          <div class="empty-title" data-i18n>Boş tuval</div>
+          <div data-i18n-html="Soldaki paletten bir şekil sürükleyin, boş alana **çift tıklayın** ya da Unity script'lerinizi buraya **sürükleyip bırakın**."></div>
+        </div>
+        <div class="drop-hint" data-i18n>Bırakın: .cs → sınıf diyagramı · .json → belge · .mmd → Mermaid</div>
+      </div>
+      <footer class="statusbar">
+        <span id="countLabel"></span>
+        <span class="sb-sep"></span>
+        <span id="saveState" class="save-state"></span>
+        <div class="spacer"></div>
+        <button class="sb-btn" id="toggleSnap" data-i18n-title="Izgaraya ve hizalara yapış (Alt ile geçici kapat)">
+          <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 3v8a6 6 0 0 0 12 0V3"/><path d="M6 7h4M14 7h4"/></svg><span data-i18n>Yapış</span></button>
+        <button class="sb-btn" id="toggleGrid" data-i18n-title="Izgarayı göster">
+          <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg><span data-i18n>Izgara</span></button>
+        <button class="sb-btn touch-only" id="toggleSelect" data-i18n-title="Çoklu seçim modu: dokunarak birden fazla şekil seçin, boş alanda sürükleyerek çerçeveyle seçin">
+          <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h3M10 4h4M17 4h3v3M20 10v4M20 17v3h-3M14 20h-4M7 20H4v-3M4 14v-4M4 7V4"/></svg><span data-i18n>Seç</span></button>
+        <span class="sb-sep"></span>
+        <button class="sb-btn icon" id="zoomOut" data-i18n-title="Uzaklaştır">−</button>
+        <button class="sb-btn zoom" id="zoomLabel" data-i18n-title="%100'e dön">100%</button>
+        <button class="sb-btn icon" id="zoomIn" data-i18n-title="Yakınlaştır">+</button>
+      </footer>
+    </section>
+
+    <aside class="panel" id="panel">
+      <div class="panel-body" id="panelBody"></div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/uml.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/csharp.js"></script>
+  <script src="js/mermaid.js"></script>
+  <script src="js/zip.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/io.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/panel.js"></script>
+  <script src="js/drive.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

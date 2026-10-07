@@ -1,0 +1,17 @@
+{
+  "name": "UML Studio",
+  "short_name": "UML Studio",
+  "description": "UML sınıf diyagramı ve akış şeması editörü — Unity kısayolları, C# içe/dışa aktarım, Google Drive senkronu",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#121419",
+  "theme_color": "#181b21",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

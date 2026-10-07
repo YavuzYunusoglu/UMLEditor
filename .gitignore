@@ -1,0 +1,11 @@
+# İşletim sistemi / editör dosyaları
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Yerel denemeler
+node_modules/
+*.log
