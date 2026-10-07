@@ -11,7 +11,7 @@
   const SCOPE = 'https://www.googleapis.com/auth/drive.file';
   const API = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-  const FIELDS = 'id,name,modifiedTime,version,size';
+  const FIELDS = 'id,name,modifiedTime,version,size,md5Checksum';
   const K = { token: 'umlstudio.gtoken', link: 'umlstudio.driveLink', client: 'umlstudio.gclient', folder: 'umlstudio.gfolder', auto: 'umlstudio.driveAuto' };
 
   const ls = {
@@ -22,7 +22,7 @@
 
   const state = {
     token: null, expiresAt: 0, user: null,
-    link: null,          // { id, name, version, modifiedTime, dirty }
+    link: null,          // { id, name, version, md5, modifiedTime, dirty }
     status: 'off',       // off | signedout | ready | idle | saving | saved | conflict | expired | error
     error: null, lastSync: null, saving: false, pending: false,
     auto: ls.get(K.auto) !== '0',
@@ -40,8 +40,18 @@
   }
   function persistLink() { ls.set(K.link, state.link ? JSON.stringify(state.link) : null); }
   function setLink(meta, dirty) {
-    state.link = meta ? { id: meta.id, name: meta.name, version: String(meta.version), modifiedTime: meta.modifiedTime, dirty: !!dirty } : null;
+    state.link = meta ? { id: meta.id, name: meta.name, version: String(meta.version), md5: meta.md5Checksum || null, modifiedTime: meta.modifiedTime, dirty: !!dirty } : null;
     persistLink();
+  }
+  /* Drive'ın "version" alanı içerik dışı değişikliklerde de (meta veri, sunucu tarafı işlemler) artar;
+     bu yüzden gerçek değişikliği içerik özetiyle (md5) anlarız. Özet yoksa (eski bağlantı) sürüme bakılır. */
+  function remoteChanged(meta) {
+    if (state.link.md5 && meta.md5Checksum) {
+      if (meta.md5Checksum !== state.link.md5) return true;
+      if (String(meta.version) !== state.link.version) setLink(meta, state.link.dirty); // yalnızca sürüm kaydı: yerelde güncelle
+      return false;
+    }
+    return String(meta.version) !== state.link.version;
   }
 
   const emit = () => Store.emit('drive');
@@ -223,7 +233,7 @@
     try {
       const meta = await api(`/files/${state.link.id}?fields=${FIELDS},trashed`);
       if (meta.trashed) throw Object.assign(new Error($t('Bağlı Drive dosyası çöp kutusuna taşınmış')), { code: 404 });
-      if (String(meta.version) !== state.link.version && !opts.force) {
+      if (!opts.force && remoteChanged(meta)) {
         state.saving = false;
         setStatus('conflict');
         if (!opts.silent) await resolveConflict(meta);
@@ -288,7 +298,7 @@
     try {
       const meta = await api(`/files/${state.link.id}?fields=${FIELDS},trashed`);
       if (meta.trashed) throw Object.assign(new Error('trashed'), { code: 404 });
-      if (String(meta.version) === state.link.version) { setStatus('saved'); return; }
+      if (!remoteChanged(meta)) { setStatus('saved'); return; }
       if (!state.link.dirty) {
         await open(meta.id, { message: $t('Drive\'daki güncel sürüm yüklendi ({date})', { date: fmtDate(meta.modifiedTime) }) });
       } else {
