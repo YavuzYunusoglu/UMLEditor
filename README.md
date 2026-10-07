@@ -1,5 +1,7 @@
 # UML Studio
 
+**Visit the site with github pages: <https://yavuzyunusoglu.github.io/UMLEditor/>**
+
 A free, offline-first **UML class diagram and flowchart editor** for the browser, with **Unity shortcuts** and **C# import/export**. It runs in the browser and works on desktop, tablet and phone. There is nothing to install, and an optional **Google Drive** sync lets you start a diagram on one device and continue on another.
 
 > [!IMPORTANT]
