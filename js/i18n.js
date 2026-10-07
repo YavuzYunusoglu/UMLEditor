@@ -258,7 +258,6 @@
     'Belgeyi Drive dosyasından ayır': 'Unlink document from Drive file',
     'Hesap değiştir': 'Switch account',
     'Çıkış yap': 'Sign out',
-    'Drive ayarları (Client ID)…': 'Drive settings (Client ID)…',
     'Yükleniyor…': 'Loading…',
     'Dosya ara…': 'Search files…',
     'Drive\'da henüz UML Studio dosyası yok. "Bu belgeyi kaydet" ile ilk dosyanızı oluşturun.': 'There are no UML Studio files on Drive yet. Create your first one with "Save this document".',

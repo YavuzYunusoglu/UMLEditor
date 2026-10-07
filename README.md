@@ -284,7 +284,7 @@ Drive sync needs your own free OAuth Client ID from Google Cloud.
      googleClientId: '1234567890-abc...apps.googleusercontent.com',
    };
    ```
-   A Client ID is **not a secret**, so it is safe to commit. The *client secret* that the Google console may show is not used by this app; never put it anywhere. Alternatively, you can paste it in the app under **Drive → Drive settings (Client ID)…**; it is then stored only in that browser.
+   A Client ID is **not a secret**, so it is safe to commit. The *client secret* that the Google console may show is not used by this app; never put it anywhere. If `config.js` has no Client ID, the app shows a setup window when you sign in, where you can paste it; it is then stored only in that browser.
 
 The Google Cloud project, the Drive API and GitHub Pages are free; no billing account is needed. Each user's files count against their own Drive storage.
 

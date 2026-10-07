@@ -398,7 +398,6 @@
     }
     items.push({ sep: true });
     if (signed) items.push({ label: $t('Hesap değiştir'), action: () => signIn({ selectAccount: true }).catch((e) => fail(e, false)) }, { label: $t('Çıkış yap'), icon: 'logout', action: signOut });
-    items.push({ label: $t('Drive ayarları (Client ID)…'), action: () => showSetup('settings') });
     return items;
   }
 

@@ -284,7 +284,7 @@ Drive senkronu için Google Cloud'dan kendinize ait ücretsiz bir OAuth Client I
      googleClientId: '1234567890-abc...apps.googleusercontent.com',
    };
    ```
-   Client ID **gizli bir bilgi değildir**, depoya eklenmesinde sakınca yoktur. Google konsolunun gösterebileceği *client secret* ise bu uygulamada kullanılmaz; onu hiçbir yere yazmayın. Client ID'yi isterseniz uygulamada **Drive → Drive ayarları (Client ID)…** penceresine de yapıştırabilirsiniz; o zaman yalnızca o tarayıcıda saklanır.
+   Client ID **gizli bir bilgi değildir**, depoya eklenmesinde sakınca yoktur. Google konsolunun gösterebileceği *client secret* ise bu uygulamada kullanılmaz; onu hiçbir yere yazmayın. `config.js` içinde Client ID yoksa uygulama giriş yaparken bir kurulum penceresi açar; Client ID'yi oraya da yapıştırabilirsiniz, o zaman yalnızca o tarayıcıda saklanır.
 
 Google Cloud projesi, Drive API ve GitHub Pages ücretsizdir; faturalandırma hesabı gerekmez. Her kullanıcının dosyaları kendi Drive kotasında saklanır.
 
