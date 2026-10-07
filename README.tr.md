@@ -363,4 +363,4 @@ Arayüzdeki tüm metinler [`js/i18n.js`](js/i18n.js) içindeki `$t('…')` fonks
 
 ## Lisans
 
-Henüz bir lisans seçilmedi. Bir `LICENSE` dosyası eklenene kadar varsayılan telif hakkı kuralları geçerlidir. Başkalarının bu projeyi kullanabilmesini veya değiştirebilmesini istiyorsanız MIT gibi bir açık kaynak lisansı ekleyin.
+Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır.

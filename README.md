@@ -361,4 +361,4 @@ All interface text goes through `$t('…')` in [`js/i18n.js`](js/i18n.js). The T
 
 ## License
 
-No license has been chosen yet. Until a `LICENSE` file is added, the default copyright rules apply. If you want others to be able to use or modify this project, add an open-source license such as MIT.
+This project is licensed under the [MIT License](LICENSE).
