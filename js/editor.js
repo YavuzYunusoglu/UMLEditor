@@ -313,7 +313,10 @@
   function startNodeDrag(id, p, e) {
     const multi = e.shiftKey || e.ctrlKey || e.metaKey || selectMode;
     const wasSel = Store.sel.nodes.has(id);
-    if (multi) {
+    // seçim modunda seçili şekle dokunmak hemen seçimden çıkarmaz: sürüklenirse tüm seçim taşınır,
+    // sürüklenmeden bırakılırsa (onUp) seçimden çıkar
+    const toggleOff = selectMode && wasSel;
+    if (multi && !toggleOff) {
       const s = new Set(Store.sel.nodes);
       if (wasSel) { s.delete(id); Store.select(s, Store.sel.edges); st = { mode: 'none' }; return; }
       s.add(id);
@@ -335,7 +338,7 @@
     for (const nid of ids) { const n = Store.node(nid); if (n) orig.set(nid, { x: n.x, y: n.y }); }
     const edgeMids = tab.edges.filter((ed) => ed.mid && ids.has(ed.from) && ids.has(ed.to)).map((ed) => ({ e: ed, x: ed.mid.x, y: ed.mid.y }));
     Store.begin();
-    st = { mode: 'drag', id, start: p, orig, edgeMids, moved: false, clickedSel: wasSel && !multi, ids };
+    st = { mode: 'drag', id, start: p, orig, edgeMids, moved: false, clickedSel: wasSel && !multi, toggleOff, ids };
   }
 
   function startResize(handle, p, e) {
@@ -521,7 +524,8 @@
     st = null;
     wrap.classList.remove('panning');
     const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
-    if (isTouch && e.type === 'pointerup' && !s.moved && (s.mode === 'drag' || s.mode === 'edgeclick' || s.mode === 'tpan')) handleTap(s, e);
+    // seçim modunda dokunuşlar seçimi değiştirir; çift dokunuşla düzenleme açılmaz
+    if (isTouch && e.type === 'pointerup' && !s.moved && !selectMode && (s.mode === 'drag' || s.mode === 'edgeclick' || s.mode === 'tpan')) handleTap(s, e);
     else if (isTouch) lastTap = null;
     switch (s.mode) {
       case 'rpan':
@@ -529,7 +533,11 @@
         break;
       case 'drag':
         Store.end();
-        if (!s.moved && s.clickedSel && Store.sel.nodes.size > 1 && !selectMode) Store.select([s.id], []);
+        if (!s.moved && s.toggleOff && e.type === 'pointerup') {
+          const sel = new Set(Store.sel.nodes);
+          sel.delete(s.id);
+          Store.select(sel, Store.sel.edges);
+        } else if (!s.moved && s.clickedSel && Store.sel.nodes.size > 1 && !selectMode) Store.select([s.id], []);
         break;
       case 'resize':
         Store.end();

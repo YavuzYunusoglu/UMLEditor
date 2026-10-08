@@ -193,7 +193,9 @@ Google erişim anahtarı yaklaşık bir saat geçerlidir. Süresi dolunca göste
 | Çift dokunuş | Metni düzenler (boş alanda: hızlı ekleme) |
 | Uzun basış | Bağlam menüsü (*Özellikler* sağ paneli açar) |
 | Seçili şeklin etrafındaki mavi noktayı sürüklemek | Bağlantı çizer |
-| Alt çubuktaki **Seç** düğmesi | Çoklu seçim modu: dokunarak seçime ekleyin, boş alanda sürükleyerek çerçeveyle seçin |
+| Tuvaldeki **Seç** düğmesi | Çoklu seçim modu: dokunarak seçime ekleyin/çıkarın, boş alanda sürükleyerek çerçeveyle seçin |
+| Seçim modunda seçili bir şekli sürüklemek | Tüm seçimi birlikte taşır |
+| Seçim çubuğundaki düğmeler | Tümünü seç, çoğalt, sil veya seçimi kaldır |
 
 Küçük ekranlarda palet ve özellikler paneli yandan açılan çekmecelere dönüşür; sekme çubuğundaki düğmelerle açılır. Tarayıcı menüsünden **Ana ekrana ekle** seçerek uygulamayı kurabilirsiniz; internet yokken de açılır.
 

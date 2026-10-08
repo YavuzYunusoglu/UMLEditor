@@ -500,6 +500,7 @@
     'Yapış': 'Snap',
     'Izgara': 'Grid',
     'Seç': 'Select',
+    'Seçimi kaldır': 'Clear selection',
     'Geri al (Ctrl+Z)': 'Undo (Ctrl+Z)',
     'Yinele (Ctrl+Y)': 'Redo (Ctrl+Y)',
     'Ekrana sığdır (Shift+1)': 'Fit to screen (Shift+1)',

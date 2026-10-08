@@ -413,6 +413,10 @@
     $('togglePalette').addEventListener('click', () => togglePane('palette'));
     $('scrim').addEventListener('click', closePanes);
     $('toggleSelect').addEventListener('click', () => Editor.setSelectMode(!Editor.selectMode));
+    $('selAll').addEventListener('click', Editor.selectAll);
+    $('selDup').addEventListener('click', Editor.duplicate);
+    $('selDelete').addEventListener('click', () => Store.deleteSelection());
+    $('selClear').addEventListener('click', () => Store.clearSelection());
     UI.dropdown($('btnDrive'), () => App.Drive.menuItems());
     updateThemeButton();
   }
@@ -468,6 +472,10 @@
     const t = Store.tab;
     const sel = Store.sel.nodes.size + Store.sel.edges.size;
     document.getElementById('countLabel').textContent = $t('{n} şekil · {e} bağlantı', { n: t.nodes.length, e: t.edges.length }) + (sel ? ' · ' + $t('{n} seçili', { n: sel }) : '');
+    const bar = document.getElementById('selBar');
+    bar.classList.toggle('mode', Editor.selectMode);
+    bar.classList.toggle('has-sel', sel > 0);
+    document.getElementById('selCount').textContent = $t('{n} seçili', { n: sel });
   }
 
   /* ======================= PALET ======================= */

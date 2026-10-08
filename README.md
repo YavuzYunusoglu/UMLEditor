@@ -193,7 +193,9 @@ Google access tokens last about an hour. When yours expires, the indicator shows
 | Double-tap | Edit text (on empty canvas: quick add) |
 | Long-press | Context menu (*Properties* opens the side panel) |
 | Drag a blue dot around a selected shape | Draw a connection |
-| **Select** button in the bottom bar | Multi-select mode: tap to add shapes, drag on empty canvas to box-select |
+| **Select** button on the canvas | Multi-select mode: tap to add or remove shapes, drag on empty canvas to box-select |
+| Dragging a selected shape in select mode | Moves the whole selection |
+| Selection bar buttons | Select all, duplicate, delete or clear the selection |
 
 On small screens, the palette and the properties panel slide in as drawers; open them with the buttons in the tab bar. In your browser menu, choose **Add to Home Screen** to install the app. It also opens without an internet connection.
 

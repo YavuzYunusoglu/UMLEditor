@@ -423,6 +423,24 @@ select.input { padding: 0 6px; cursor: pointer; }
 .touch .edge-hit { stroke-width: 26px; }
 .canvas-wrap.select-mode { box-shadow: inset 0 0 0 2px var(--ok); }
 .touch-only { display: none; }
+
+/* Dokunmatik çoklu seçim çubuğu */
+.sel-bar {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 4;
+  align-items: center; gap: 2px; padding: 4px; max-width: calc(100% - 24px);
+  background: var(--panel); border: 1px solid var(--border2); border-radius: 12px; box-shadow: var(--shadow);
+}
+.canvas-wrap.empty .sel-bar { display: none; }
+.sel-btn {
+  height: 40px; min-width: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 10px; border: 0; border-radius: 9px; background: transparent; color: var(--text2); font: inherit; font-size: 13px; font-weight: 550; cursor: pointer;
+}
+.sel-btn:active { background: var(--hover); }
+.sel-btn.danger { color: var(--danger); }
+.sel-toggle.active { background: var(--ok); color: #fff; }
+.sel-count { padding: 0 8px; font-size: 12.5px; color: var(--text2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sel-count, .sel-mode-only, .sel-has-only { display: none; }
+.sel-bar.mode .sel-count, .sel-bar.has-sel .sel-count, .sel-bar.mode .sel-mode-only, .sel-bar.has-sel .sel-has-only { display: inline-flex; }
 .scrim { display: none; }
 
 /* Dokunmatik cihazlar */
