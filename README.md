@@ -212,7 +212,7 @@ Press `Ctrl+K` (or `/`) to search every shape, Unity template and command.
 | `Ctrl+O` | Open file |
 | `Ctrl+K`, `/` | Command palette / quick add |
 | `Ctrl+Z`, `Ctrl+Y` | Undo / redo |
-| `Ctrl+C` `Ctrl+X` `Ctrl+V` `Ctrl+D` | Copy / cut / paste / duplicate (the copy goes where the mouse is) |
+| `Ctrl+C` `Ctrl+X` `Ctrl+V` `Ctrl+D` | Copy / cut / paste / duplicate (pasted and duplicated shapes go where the mouse is) |
 | `Ctrl+A`, `Delete` | Select all, delete |
 | `F2` or `Enter` | Edit the selected shape or line |
 | Arrow keys (+`Shift`) | Nudge by 1 px (10 px) |

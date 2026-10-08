@@ -920,10 +920,14 @@
     return true;
   }
   function cut() { if (copy()) Store.deleteSelection(); }
-  function paste() {
+  /* at: dünya noktası (ör. sağ tık konumu). Verilmezse fare tuvalin üzerindeyse imlecin olduğu yere,
+     değilse her yapıştırmada biraz daha kaydırarak */
+  function paste(at) {
     let frag = clipboard;
     if (!frag) { try { frag = JSON.parse(localStorage.getItem('umlstudio.clipboard') || 'null'); } catch (e) { frag = null; } }
     if (!frag || !frag.nodes || !frag.nodes.length) return;
+    if (!(at && isFinite(at.x) && isFinite(at.y))) at = lastMouse ? toWorld(lastMouse.x, lastMouse.y) : null;
+    if (at) { insertFragment(U.clone(frag), { at }); return; }
     pasteN++;
     insertFragment(U.clone(frag), { offset: 20 * pasteN });
   }

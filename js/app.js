@@ -676,7 +676,7 @@
     } else {
       items.push(
         { label: $t('Hızlı ekle…'), icon: 'plus', shortcut: 'Ctrl+K', action: () => openCommandPalette(p) },
-        { label: $t('Yapıştır'), icon: 'copy', shortcut: 'Ctrl+V', action: Editor.paste },
+        { label: $t('Yapıştır'), icon: 'copy', shortcut: 'Ctrl+V', action: () => Editor.paste(p) },
         { label: $t('Tümünü seç'), shortcut: 'Ctrl+A', action: Editor.selectAll },
         { sep: true },
         { label: $t('Ekrana sığdır'), icon: 'fit', shortcut: 'Shift+1', action: () => Editor.fitView() },
