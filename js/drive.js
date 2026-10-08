@@ -12,7 +12,9 @@
   const API = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
   const FIELDS = 'id,name,modifiedTime,version,size,md5Checksum';
-  const K = { token: 'umlstudio.gtoken', link: 'umlstudio.driveLink', client: 'umlstudio.gclient', folder: 'umlstudio.gfolder', auto: 'umlstudio.driveAuto' };
+  const K = { token: 'umlstudio.gtoken', link: 'umlstudio.driveLink', client: 'umlstudio.gclient', folder: 'umlstudio.gfolder', auto: 'umlstudio.driveAuto', remember: 'umlstudio.driveRemember' };
+  // erişim anahtarı bitmeden bu kadar önce (bir sonraki tıklamada) yenilenir
+  const RENEW_BEFORE = 5 * 60000;
 
   const ls = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -26,18 +28,28 @@
     status: 'off',       // off | signedout | ready | idle | saving | saved | conflict | expired | error
     error: null, lastSync: null, saving: false, pending: false,
     auto: ls.get(K.auto) !== '0',
+    // beni hatırla: hesap bu cihazda kalır ve oturum süresi dolunca kendiliğinden yenilenir.
+    // kapalıyken oturum yalnızca bu tarayıcı oturumunda (sessionStorage) tutulur.
+    remember: ls.get(K.remember) !== '0',
   };
 
   /* ---------- kalıcılık ---------- */
+  const ss = {
+    get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { /* yok say */ } },
+  };
   function restore() {
-    const t = ls.json(K.token);
+    let t = ls.json(K.token);
+    if (!t) { try { t = JSON.parse(ss.get(K.token) || 'null'); } catch (e) { t = null; } }
     if (t && t.token && t.expiresAt > Date.now() + 60000) { state.token = t.token; state.expiresAt = t.expiresAt; state.user = t.user || null; }
     else if (t && t.user) state.user = t.user;
     state.link = ls.json(K.link);
   }
   function persistToken() {
-    ls.set(K.token, JSON.stringify({ token: state.token, expiresAt: state.expiresAt, user: state.user }));
+    const v = JSON.stringify({ token: state.token, expiresAt: state.expiresAt, user: state.user });
+    if (state.remember) { ls.set(K.token, v); ss.set(K.token, null); } else { ss.set(K.token, v); ls.set(K.token, null); }
   }
+  function clearToken() { ls.set(K.token, null); ss.set(K.token, null); }
   function persistLink() { ls.set(K.link, state.link ? JSON.stringify(state.link) : null); }
   function setLink(meta, dirty) {
     state.link = meta ? { id: meta.id, name: meta.name, version: String(meta.version), md5: meta.md5Checksum || null, modifiedTime: meta.modifiedTime, dirty: !!dirty } : null;
@@ -82,8 +94,13 @@
     return gisPromise;
   }
 
-  let tokenClient = null, tokenCb = null;
-  async function signIn(opts) {
+  let tokenClient = null, tokenCb = null, signingIn = null;
+  /* Aynı anda tek giriş penceresi: ikinci çağrı süren girişi bekler */
+  function signIn(opts) {
+    if (!signingIn) signingIn = doSignIn(opts).finally(() => { signingIn = null; });
+    return signingIn;
+  }
+  async function doSignIn(opts) {
     opts = opts || {};
     if (!supported()) { showSetup('file'); throw quiet($t('Drive için uygulamayı http(s) üzerinden açın')); }
     const cid = clientId();
@@ -118,10 +135,43 @@
       state.user = a.user;
       persistToken();
     } catch (e) { /* kullanıcı bilgisi isteğe bağlı */ }
+    renewBlocked = false;
     setStatus(state.link ? 'idle' : 'ready');
-    UI.toast($t('Google Drive bağlandı') + (state.user ? ': ' + state.user.emailAddress : ''), 'ok');
+    if (!opts.silent) UI.toast($t('Google Drive bağlandı') + (state.user ? ': ' + state.user.emailAddress : ''), 'ok');
     await checkRemote();
+    if (state.link && state.link.dirty) autoSync();
     return true;
+  }
+
+  /* ---------- beni hatırla: oturumu kendiliğinden yenile ----------
+     Google'ın tarayıcı girişi (GIS) yalnızca ~1 saatlik erişim anahtarı verir; yenileme anahtarı yoktur.
+     Yenileme bir Google penceresi açar ve tarayıcılar pencereyi yalnızca bir kullanıcı hareketiyle açtırır.
+     Bu yüzden süre dolmak üzereyken (ya da dolmuşken) kullanıcının bir sonraki tıklamasında, hesap ipucuyla
+     ve onay istemeden yenileriz: pencere kendiliğinden açılıp kapanır. */
+  let renewBlocked = false; // otomatik yenileme başarısız olduysa elle girişe kadar tekrar denenmez
+  function wantsRenew() {
+    return state.remember && !!state.user && !renewBlocked && !signingIn && supported() && !!clientId() &&
+      Date.now() > state.expiresAt - RENEW_BEFORE;
+  }
+  function onUserClick(e) {
+    if (!wantsRenew() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    // yazarken ya da bir pencere / menü açıkken odak çalınmasın; Drive düğmesi kendi girişini yapar
+    if (App.Editor.editing || UI.topModal() || App.Editor.isTyping(document.activeElement)) return;
+    if (e.target.closest && e.target.closest('#btnDrive, .menu')) return;
+    signIn({ silent: true }).catch((err) => {
+      renewBlocked = true;
+      if (err && err.quiet) return;
+      setStatus('expired');
+      UI.toast($t('Drive oturumu otomatik yenilenemedi: {msg}', { msg: err.message }), 'warn', { action: { label: $t('Giriş yap'), fn: () => App.Drive.signIn() } });
+    });
+  }
+
+  function setRemember(v) {
+    state.remember = !!v;
+    ls.set(K.remember, v ? '1' : '0');
+    if (state.token || state.user) persistToken(); // anahtarı uygun depoya taşı
+    emit();
+    UI.toast(v ? $t('Drive oturumu bu cihazda hatırlanacak') : $t('Drive oturumu tarayıcı kapanınca unutulacak'));
   }
   function quiet(msg) { const e = new Error(msg); e.quiet = true; return e; }
 
@@ -132,7 +182,7 @@
       try { google.accounts.oauth2.revoke(state.token, () => {}); } catch (e) { /* yok say */ }
     }
     state.token = null; state.expiresAt = 0; state.user = null;
-    ls.set(K.token, null);
+    clearToken();
     setStatus('signedout');
     UI.toast($t('Google Drive oturumu kapatıldı'));
   }
@@ -401,6 +451,7 @@
       { label: $t('Drive\'dan aç…'), icon: 'cloudDown', action: () => openDialog() },
       { sep: true },
       { label: $t('Otomatik senkron'), checked: state.auto, action: () => setAuto(!state.auto) },
+      { label: $t('Beni hatırla (oturumu otomatik yenile)'), checked: state.remember, action: () => setRemember(!state.remember) },
     );
     if (state.link) {
       items.push({ label: $t('Drive\'ı şimdi kontrol et'), icon: 'refresh', action: () => (hasToken() ? checkRemote() : signIn()).catch((e) => fail(e, false)) });
@@ -507,6 +558,10 @@
     Store.on('load', () => { if (!loadingFromDrive && state.link) { setLink(null); setStatus(hasToken() ? 'ready' : 'off'); } });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoSync.flush(); else if (state.link && hasToken() && !state.saving) checkRemote(); });
     window.addEventListener('online', () => { if (state.link && state.link.dirty) autoSync(); });
+    // beni hatırla: süre dolmak üzereyken bir sonraki tıklamada oturumu yenile (pencere açmak için kullanıcı hareketi gerekir)
+    document.addEventListener('pointerup', onUserClick);
+    // giriş betiği önceden yüklensin ki yenileme penceresi tıklamanın hemen ardından açılabilsin
+    if (state.remember && state.user && supported() && clientId()) loadGis().catch(() => { /* çevrimdışı: sonra denenir */ });
     emit();
     if (state.link && hasToken()) checkRemote();
   }

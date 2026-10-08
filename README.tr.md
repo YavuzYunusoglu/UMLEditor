@@ -175,7 +175,7 @@ Dışa aktarılmış bir PNG örneği (açık tema):
 4. Bir cihaza geri döndüğünüzde uygulama Drive'ı kontrol eder. O cihazda değişiklik yapmadıysanız yeni sürümü kendiliğinden yükler.
 5. Aynı belge **iki cihazda da** kaydedilmeden değiştirildiyse bir çakışma penceresi açılır: *Drive'dakini aç*, *Üzerine yaz* ya da *Benimkini kopya olarak kaydet* (hiçbir şey kaybolmaz).
 
-Google erişim anahtarı yaklaşık bir saat geçerlidir. Süresi dolunca gösterge *Giriş gerekli* yazar; tek tıkla yeniden bağlanırsınız.
+Google erişim anahtarı yaklaşık bir saat geçerlidir. **Drive → Beni hatırla** açıkken (varsayılan) uygulama hesabınızı bu cihazda hatırlar ve süre dolmak üzereyken bir sonraki tıklamanızda oturumu kendiliğinden yeniler: bir Google penceresi bir an açılıp kapanır, hesap seçmeniz ya da izin vermeniz gerekmez. Google hesabınızdan çıkış yaptıysanız pencerede giriş yapmanız istenir. Yenileme yapılamazsa (ör. pencereyi kapattıysanız) gösterge *Giriş gerekli* yazar; tek tıkla yeniden bağlanırsınız. *Beni hatırla* kapalıyken oturum tarayıcı kapanınca unutulur ve kendiliğinden yenilenmez.
 
 ### 9. Tablet ve telefon
 
@@ -302,7 +302,7 @@ Tam metinler: [Gizlilik Politikası](privacy.html) ve [Kullanım Koşulları](te
 - Çalışmalarınız her cihazda **tarayıcının yerel depolamasına** otomatik kaydedilir.
 - Drive senkronu tarayıcınızdan doğrudan Google'a bağlanır ve **`drive.file`** iznini kullanır. Bu izinle uygulama yalnızca kendi oluşturduğu dosyaları görebilir; Drive'ınızdaki başka hiçbir şeyi okuyamaz. Dosyalar **UML Studio** klasöründe saklanır.
 - Uygulamayı yayınlayan kişi (depo sahibi) kullanıcıların dosyalarını göremez; veriler onun üzerinden geçmez.
-- Google erişim anahtarı, sayfayı yenileyince tekrar giriş gerekmesin diye geçerlilik süresi boyunca (yaklaşık bir saat) yerel depolamada tutulur. **Çıkış yap** bu anahtarı iptal eder.
+- Google erişim anahtarı, sayfayı yenileyince tekrar giriş gerekmesin diye geçerlilik süresi boyunca (yaklaşık bir saat) yerel depolamada tutulur (*Beni hatırla* kapalıysa yalnızca tarayıcı kapanana kadar, oturum depolamasında). **Çıkış yap** bu anahtarı iptal eder.
 
 ---
 

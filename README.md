@@ -175,7 +175,7 @@ After the [one-time setup](#setting-up-google-drive-one-time-5-minutes), the **D
 4. When you return to a device, the app checks Drive. If you made no local changes there, it loads the newer version automatically.
 5. If the same document was changed on **both** devices, a conflict dialog lets you choose between *open the Drive version*, *overwrite*, or *save mine as a copy* (nothing is lost).
 
-Google access tokens last about an hour. When yours expires, the indicator shows *Sign-in required*; one click reconnects you.
+Google access tokens last about an hour. With **Drive → Remember me** on (the default), the app remembers your account on this device and renews the sign-in by itself on your next click shortly before it expires: a Google window flashes open and closes without asking you to pick an account or grant access again. If you have signed out of Google, the window asks you to sign in. If renewal is not possible (for example you closed the window), the indicator shows *Sign-in required* and one click reconnects you. With *Remember me* off, the sign-in is forgotten when the browser closes and is not renewed automatically.
 
 ### 9. Tablet and phone
 
@@ -302,7 +302,7 @@ See the full [Privacy Policy](privacy.html) and [Terms of Service](terms.html). 
 - Your work is autosaved in your **browser's local storage** on each device.
 - Drive sync talks directly from your browser to Google, using the **`drive.file`** scope. With this scope, the app can only see files that it created itself; it cannot read anything else in your Drive. Files are stored in a **UML Studio** folder.
 - Whoever publishes the app (the repository owner) cannot see users' files; no data passes through them.
-- The Google access token is kept in local storage for its lifetime (about one hour) so that a page reload does not force you to sign in again. **Sign out** revokes it.
+- The Google access token is kept in local storage for its lifetime (about one hour; with *Remember me* off, in session storage until the browser closes) so that a page reload does not force you to sign in again. **Sign out** revokes it.
 
 ---
 
