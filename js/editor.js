@@ -21,6 +21,7 @@
   let clipboard = null;
   let pasteN = 0;
   let selPt = null; // seçili bükülme noktası: { edge, i }
+  let lastMouse = null; // tuval üzerindeki son fare konumu (ekran): Ctrl+D kopyayı buraya koyar
   // dokunmatik
   const pointers = new Map();
   let touchMode = false, selectMode = false;
@@ -208,6 +209,7 @@
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
     if (isTouch !== touchMode) { touchMode = isTouch; wrap.classList.toggle('touch', isTouch); }
+    if (isTouch) lastMouse = null;
     if (pointers.size >= 2) { capture(e); if (pointers.size === 2) startPinch(); return; }
     if (inl) commitInline();
     App.UI.closeMenus();
@@ -240,6 +242,7 @@
     if (hEl) startResize(hEl.dataset.handle, p, e);
     else if (portEl) startConnect(portEl.dataset.node, portEl.dataset.port, p);
     else if (ehEl) startEdgeHandle(ehEl.dataset.ehandle, p, wpEl ? +wpEl.dataset.wp : -1);
+    else if (nodeEl && e.altKey && !isTouch && !selectMode) startDupDrag(nodeEl.dataset.node, p);
     else if (nodeEl) startNodeDrag(nodeEl.dataset.node, p, e);
     else if (wpEl && edgeEl) {
       // seçili olmayan bir çizginin bükülme noktası: çizgiyi seç ve noktayı sürükle
@@ -280,6 +283,7 @@
   /* Devam eden etkileşimi değişiklik bırakmadan sonlandır */
   function cancelInteraction() {
     if (!st) return;
+    if (st.mode === 'drag') dropUnmovedDup(st);
     if (st.mode === 'drag' || st.mode === 'resize' || (st.mode === 'ehandle' && (st.which === 'mid' || st.which === 'wp'))) Store.end();
     st = null;
     renderOverlay();
@@ -335,9 +339,12 @@
       s.add(id);
       Store.select(s, Store.sel.edges);
     } else if (!wasSel) Store.select([id], []);
-    const tab = Store.tab;
-    const ids = new Set(Store.sel.nodes);
-    // seçili çerçevelerin içindeki düğümler de taşınır
+    Store.begin();
+    beginDrag(id, p, withFrameContents(Store.tab, new Set(Store.sel.nodes)), { clickedSel: wasSel && !multi, toggleOff });
+  }
+
+  /* Seçili çerçevelerin içindeki düğümler de taşınır / çoğaltılır */
+  function withFrameContents(tab, ids) {
     for (const n of tab.nodes) {
       if (n.type !== 'frame' || !ids.has(n.id)) continue;
       const fb = Geo.bounds(n);
@@ -347,12 +354,44 @@
         if (b.x >= fb.x && b.y >= fb.y && b.x + b.w <= fb.x + fb.w && b.y + b.h <= fb.y + fb.h) ids.add(m.id);
       }
     }
+    return ids;
+  }
+
+  /* Sürükleme durumunu kur (çağıran Store.begin() yapmış olmalı) */
+  function beginDrag(id, p, ids, extra) {
+    const tab = Store.tab;
     const orig = new Map();
     for (const nid of ids) { const n = Store.node(nid); if (n) orig.set(nid, { x: n.x, y: n.y }); }
     const edgeMids = tab.edges.filter((ed) => ed.mid && ids.has(ed.from) && ids.has(ed.to)).map((ed) => ({ e: ed, x: ed.mid.x, y: ed.mid.y }));
     const edgePts = tab.edges.filter((ed) => Array.isArray(ed.points) && ids.has(ed.from) && ids.has(ed.to)).map((ed) => ({ e: ed, pts: ed.points.map((q) => ({ x: q.x, y: q.y })) }));
+    st = Object.assign({ mode: 'drag', id, start: p, orig, edgeMids, edgePts, moved: false, ids }, extra);
+  }
+
+  /* Alt + sürükle (Photoshop gibi): seçimi aynı yere çoğalt ve kopyaları sürükle.
+     Sürüklenmeden bırakılırsa kopya geri alınır. */
+  function startDupDrag(id, p) {
+    if (!Store.sel.nodes.has(id)) Store.select([id], []);
+    const tab = Store.tab;
+    const ids = withFrameContents(tab, new Set(Store.sel.nodes));
+    const frag = U.clone({ nodes: tab.nodes.filter((n) => ids.has(n.id)), edges: tab.edges.filter((ed) => ids.has(ed.from) && ids.has(ed.to)) });
+    const prevSel = { nodes: new Set(Store.sel.nodes), edges: new Set(Store.sel.edges) };
     Store.begin();
-    st = { mode: 'drag', id, start: p, orig, edgeMids, edgePts, moved: false, clickedSel: wasSel && !multi, toggleOff, ids };
+    const res = Store.insertFragment(frag);
+    const copyIds = new Set(res.nodes.map((n) => n.id));
+    // res.nodes, frag.nodes ile aynı sırada
+    const primary = res.nodes[frag.nodes.findIndex((n) => n.id === id)].id;
+    Store.select(res.nodes.filter((n, i) => prevSel.nodes.has(frag.nodes[i].id)).map((n) => n.id), []);
+    beginDrag(primary, p, copyIds, { dup: { res, prevSel } });
+  }
+
+  /* Hiç sürüklenmemiş Alt-kopyayı kaldır (Store.end'den önce çağrılır) */
+  function dropUnmovedDup(s) {
+    if (!s.dup || s.moved) return;
+    const t = Store.tab;
+    const nIds = new Set(s.dup.res.nodes.map((n) => n.id)), eIds = new Set(s.dup.res.edges.map((e) => e.id));
+    t.nodes = t.nodes.filter((n) => !nIds.has(n.id));
+    t.edges = t.edges.filter((e) => !eIds.has(e.id));
+    Store.select(s.dup.prevSel.nodes, s.dup.prevSel.edges);
   }
 
   function startResize(handle, p, e) {
@@ -423,8 +462,10 @@
 
   function onMove(e) {
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    lastMouse = e.pointerType === 'mouse' ? { x: e.clientX, y: e.clientY } : null;
     if (!st) {
       if (e.buttons || e.pointerType === 'touch') return;
+      wrap.classList.toggle('alt', e.altKey);
       const el = e.target.closest && e.target.closest('[data-node]');
       const id = el ? el.dataset.node : null;
       if (id !== hover) { hover = id; renderOverlay(); }
@@ -453,7 +494,8 @@
         const size = Geo.nodeSize(n);
         let nx = prim.x + dx, ny = prim.y + dy;
         st.guides = null;
-        if (snapOn(e)) {
+        // Alt ile çoğaltırken Alt basılı tutulur; bu durumda yapışmayı kapatmasın
+        if (st.dup ? settings.snap : snapOn(e)) {
           // önce akıllı hizalama, yoksa ızgaraya (merkez)
           const sm = smartSnap(Store.tab, st.ids, { x: nx, y: ny, w: size.w, h: size.h });
           nx = sm.dx != null ? nx + sm.dx : sn(nx + size.w / 2) - size.w / 2;
@@ -546,7 +588,7 @@
     wrap.classList.remove('panning');
     const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
     // seçim modunda dokunuşlar seçimi değiştirir; çift dokunuşla düzenleme açılmaz
-    const tappable = s.mode === 'drag' || s.mode === 'edgeclick' || s.mode === 'tpan' || s.mode === 'marquee' || (s.mode === 'ehandle' && (s.which === 'mid' || s.which === 'wp'));
+    const tappable = (s.mode === 'drag' && !s.dup) || s.mode === 'edgeclick' || s.mode === 'tpan' || s.mode === 'marquee' || (s.mode === 'ehandle' && (s.which === 'mid' || s.which === 'wp'));
     if (e.type === 'pointerup' && !s.moved && !selectMode && tappable) handleTap(s, e, isTouch);
     else lastTap = null;
     switch (s.mode) {
@@ -554,6 +596,7 @@
         if (!s.moved) openContextMenu(s.target, e.clientX, e.clientY, s.p);
         break;
       case 'drag':
+        dropUnmovedDup(s);
         Store.end();
         if (!s.moved && s.toggleOff && e.type === 'pointerup') {
           const sel = new Set(Store.sel.nodes);
@@ -886,7 +929,9 @@
   }
   function duplicate() {
     const frag = fragmentFromSelection();
-    if (frag) insertFragment(frag, { offset: 20 });
+    if (!frag) return;
+    // fare tuvalin üzerindeyse kopya imlecin olduğu yere; değilse (menü, dokunmatik) biraz kaydırılmış olarak
+    insertFragment(frag, lastMouse ? { at: toWorld(lastMouse.x, lastMouse.y) } : { offset: 20 });
   }
 
   /* Bir parçayı ekle. opts.at: dünya noktası (merkez), opts.offset: kaydırma */
@@ -1024,7 +1069,7 @@
     svg.addEventListener('pointermove', onMove);
     svg.addEventListener('pointerup', onUp);
     svg.addEventListener('pointercancel', onUp);
-    svg.addEventListener('pointerleave', () => { if (!st && hover) { hover = null; renderOverlay(); } });
+    svg.addEventListener('pointerleave', () => { lastMouse = null; if (!st && hover) { hover = null; renderOverlay(); } });
     svg.addEventListener('wheel', onWheel, { passive: false });
     svg.addEventListener('contextmenu', (e) => e.preventDefault());
     inlineEl.addEventListener('keydown', onInlineKey);
@@ -1033,9 +1078,13 @@
 
     window.addEventListener('keydown', (e) => {
       if (e.key === ' ' && !isTyping(e.target) && !App.UI.topModal()) { if (!spaceDown) { spaceDown = true; wrap.classList.add('space'); } e.preventDefault(); }
+      if (e.key === 'Alt') wrap.classList.add('alt');
     });
-    window.addEventListener('keyup', (e) => { if (e.key === ' ') { spaceDown = false; wrap.classList.remove('space'); } });
-    window.addEventListener('blur', () => { spaceDown = false; wrap.classList.remove('space'); });
+    window.addEventListener('keyup', (e) => {
+      if (e.key === ' ') { spaceDown = false; wrap.classList.remove('space'); }
+      if (e.key === 'Alt') wrap.classList.remove('alt');
+    });
+    window.addEventListener('blur', () => { spaceDown = false; wrap.classList.remove('space', 'alt'); });
     window.addEventListener('resize', () => renderOverlay());
 
     // paletten sürükle-bırak ve dosya bırakma

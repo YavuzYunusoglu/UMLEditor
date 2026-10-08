@@ -293,7 +293,7 @@
     showShortcuts() {
       const rows = [
         [$t('Genel'), [['Ctrl+S', $t('Kaydet')], ['Ctrl+Shift+S', $t('Farklı kaydet')], ['Ctrl+O', $t('Aç')], ['Ctrl+K | /', $t('Komut paleti / hızlı ekle')], ['Ctrl+Z / Ctrl+Y', $t('Geri al / Yinele')], ['?', $t('Bu pencere')]]],
-        [$t('Düzenleme'), [['Ctrl+C / X / V', $t('Kopyala / Kes / Yapıştır')], ['Ctrl+D', $t('Çoğalt')], ['Ctrl+A', $t('Tümünü seç')], ['Delete', $t('Sil')], ['F2 / Enter', $t('Metni düzenle')], [$t('Ok tuşları'), $t('Kaydır (Shift: 10px)')], ['Ctrl+G', $t('Seçimi grupla')], ['Ctrl+Enter', $t('Üye düzenlemeyi bitir')]]],
+        [$t('Düzenleme'), [['Ctrl+C / X / V', $t('Kopyala / Kes / Yapıştır')], ['Ctrl+D', $t('İmlecin olduğu yere çoğalt')], [$t('Alt + şekli sürükle'), $t('Çoğaltarak taşı')], ['Ctrl+A', $t('Tümünü seç')], ['Delete', $t('Sil')], ['F2 / Enter', $t('Metni düzenle')], [$t('Ok tuşları'), $t('Kaydır (Shift: 10px)')], ['Ctrl+G', $t('Seçimi grupla')], ['Ctrl+Enter', $t('Üye düzenlemeyi bitir')]]],
         [$t('Görünüm'), [[$t('Tekerlek'), $t('Yakınlaştır')], [$t('Boşluk + sürükle'), $t('Kaydır')], [$t('Orta / sağ tık sürükle'), $t('Kaydır')], ['Shift+1', $t('Ekrana sığdır')], ['Ctrl+0', '100%'], ['Ctrl+ + / -', $t('Yakınlaştır / uzaklaştır')], [$t('Alt + sürükle'), $t('Yapışmayı kapat')]]],
         [$t('Seçim'), [[$t('Shift / Ctrl + tık'), $t('Seçime ekle')], [$t('Sağa doğru çerçeve'), $t('Tamamen içeridekiler')], [$t('Sola doğru çerçeve'), $t('Değenler')]]],
       ];

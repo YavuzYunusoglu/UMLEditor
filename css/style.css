@@ -180,6 +180,7 @@ body.palette-hidden .palette, body.panel-hidden .panel { display: none; }
 .canvas-wrap.space #canvas { cursor: grab; }
 .canvas-wrap.panning #canvas, .canvas-wrap.panning #canvas * { cursor: grabbing !important; }
 #canvas .node { cursor: move; }
+.canvas-wrap.alt #canvas .node { cursor: copy; }
 #canvas .edge, #canvas .edge-label { cursor: pointer; }
 #canvas .edge:hover path:not(.edge-hit) { stroke-width: 2.4; }
 #canvas text { pointer-events: none; }

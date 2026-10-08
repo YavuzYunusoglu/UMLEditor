@@ -212,7 +212,7 @@ Tüm şekilleri, Unity şablonlarını ve komutları aramak için `Ctrl+K` (ya d
 | `Ctrl+O` | Dosya aç |
 | `Ctrl+K`, `/` | Komut paleti / hızlı ekleme |
 | `Ctrl+Z`, `Ctrl+Y` | Geri al / yinele |
-| `Ctrl+C` `Ctrl+X` `Ctrl+V` `Ctrl+D` | Kopyala / kes / yapıştır / çoğalt |
+| `Ctrl+C` `Ctrl+X` `Ctrl+V` `Ctrl+D` | Kopyala / kes / yapıştır / çoğalt (kopya farenin olduğu yere konur) |
 | `Ctrl+A`, `Delete` | Tümünü seç, sil |
 | `F2` veya `Enter` | Seçili şekli ya da çizgiyi düzenle |
 | Ok tuşları (+`Shift`) | 1 px (10 px) kaydır |
@@ -221,6 +221,7 @@ Tüm şekilleri, Unity şablonlarını ve komutları aramak için `Ctrl+K` (ya d
 | `Boşluk` + sürükle, orta/sağ tık sürükle | Kaydır |
 | `Shift+1`, `Ctrl+0` | Ekrana sığdır, %100 |
 | Sürüklerken `Alt` | Yapışmayı geçici olarak kapat |
+| `Alt` + şekli sürükle | Şekli çoğaltır ve kopyayı sürükler (Photoshop gibi) |
 | `?` | Tüm kısayolları göster |
 
 Çerçeveyle seçim çoğu CAD programındaki gibi çalışır: sağa doğru sürüklerseniz çerçevenin **tamamen içinde kalan** şekiller, sola doğru sürüklerseniz çerçevenin **değdiği** şekiller seçilir.
