@@ -264,6 +264,59 @@ test('Dik rota: hizalı düğümler düz çizgi', () => {
   const g = [...App.Geo.computeEdges(tab).values()][0];
   assert.strictEqual(g.pts.length, 2);
 });
+function bendTab(routing, bx, by, points, sides) {
+  const tab = App.Model.newTab('t');
+  tab.routing = routing;
+  const a = App.Model.createNode('process', 0, 0), b = App.Model.createNode('process', bx, by);
+  const e = App.Model.createEdge(a.id, b.id, 'flow', Object.assign({ points }, sides || {}));
+  tab.nodes.push(a, b); tab.edges.push(e);
+  return { tab, e, g: () => App.Geo.computeEdges(tab).get(e.id) };
+}
+const hasPt = (pts, q) => pts.some((p) => Math.abs(p.x - q.x) < 0.01 && Math.abs(p.y - q.y) < 0.01);
+test('Bükülme noktası: dik rota noktalardan geçer ve hep dik kalır', () => {
+  let seed = 7;
+  const rnd = (n) => { seed = (seed * 16807) % 2147483647; return Math.round(((seed / 2147483647) - 0.5) * n); };
+  const SIDES = App.Geo.SIDES;
+  for (let k = 0; k < 400; k++) {
+    const pts = Array.from({ length: 1 + (k % 3) }, () => ({ x: rnd(800), y: rnd(800) }));
+    const { g } = bendTab('orthogonal', rnd(600), rnd(600), pts, { fromSide: SIDES[k % 4], toSide: SIDES[(k >> 2) % 4] });
+    const v = g();
+    for (let i = 1; i < v.pts.length; i++) {
+      const p = v.pts[i - 1], q = v.pts[i];
+      assert.ok(Math.abs(p.x - q.x) < 0.01 || Math.abs(p.y - q.y) < 0.01, 'eğik parça ' + JSON.stringify([p, q]));
+    }
+    for (const w of pts) assert.ok(App.Geo.projectOnPoly(v.pts, w).d < 0.01, 'nokta rotada değil');
+    assert.ok(hasPt(v.pts, v.start) && hasPt(v.pts, v.end));
+    // hedefe dışarıdan girer (ok başı ters dönmez)
+    const D = App.Geo.DIR[v.toSide];
+    assert.ok(Math.abs(v.endDir.x + D.x) < 1e-6 && Math.abs(v.endDir.y + D.y) < 1e-6, 'hedefe ters yönden giriş');
+  }
+});
+test('Bükülme noktası: düz ve eğri rotalar noktalardan geçer', () => {
+  const pts = [{ x: 300, y: -100 }, { x: 320, y: 260 }];
+  const s = bendTab('straight', 500, 200, pts).g();
+  assert.deepStrictEqual(plain(s.pts.slice(1, -1)), pts);
+  const c = bendTab('curved', 500, 200, pts).g();
+  for (const w of pts) assert.ok(hasPt(c.pts, w));
+  assert.ok(!/NaN/.test(c.d) && (c.d.match(/C/g) || []).length === 3);
+  // noktalar tuvalde çizilir, dışa aktarımda çizilmez
+  const { tab } = bendTab('orthogonal', 500, 200, pts);
+  assert.strictEqual((App.Render.renderTab(tab, App.Theme.themes.dark, { live: true }).edges.match(/edge-wp/g) || []).length, 2);
+  assert.ok(!/edge-wp/.test(App.Render.renderTab(tab, App.Theme.themes.dark, {}).edges));
+});
+test('Bükülme noktası: ekleme sırası çizgi boyunca konuma göre', () => {
+  const pts = [{ x: 300, y: 30 }, { x: 300, y: 330 }];
+  const v = bendTab('orthogonal', 600, 300, pts).g();
+  assert.strictEqual(App.Geo.bendInsertIndex(v.pts, pts, { x: 200, y: 30 }), 0);
+  assert.strictEqual(App.Geo.bendInsertIndex(v.pts, pts, { x: 300, y: 200 }), 1);
+  assert.strictEqual(App.Geo.bendInsertIndex(v.pts, pts, { x: 450, y: 330 }), 2);
+  assert.strictEqual(App.Geo.bendInsertIndex(v.pts, [], { x: 450, y: 330 }), 0);
+});
+test('Bükülme noktası: yapıştırınca noktalar da kayar', () => {
+  const { tab } = bendTab('orthogonal', 400, 0, [{ x: 200, y: 100 }]);
+  const res = App.Store.insertFragment({ nodes: plain(tab.nodes), edges: plain(tab.edges), offset: { x: 20, y: 20 } }, App.Model.newTab('x'));
+  assert.deepStrictEqual(plain(res.edges[0].points), [{ x: 220, y: 120 }]);
+});
 test('Yerleşim: çakışma yok', () => {
   const types = App.CSharp.parseSources([SRC]);
   const frag = App.CSharp.buildDiagram(types);

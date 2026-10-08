@@ -206,6 +206,7 @@
         const c = JSON.parse(JSON.stringify(e));
         c.id = uid('e'); c.from = map.get(e.from); c.to = map.get(e.to);
         if (c.mid && frag.offset) { c.mid = { x: c.mid.x + frag.offset.x, y: c.mid.y + frag.offset.y }; }
+        if (Array.isArray(c.points) && frag.offset) c.points = c.points.map((q) => ({ x: q.x + frag.offset.x, y: q.y + frag.offset.y }));
         return c;
       });
       // çerçeveler en alta

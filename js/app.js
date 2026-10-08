@@ -415,7 +415,7 @@
     $('toggleSelect').addEventListener('click', () => Editor.setSelectMode(!Editor.selectMode));
     $('selAll').addEventListener('click', Editor.selectAll);
     $('selDup').addEventListener('click', Editor.duplicate);
-    $('selDelete').addEventListener('click', () => Store.deleteSelection());
+    $('selDelete').addEventListener('click', () => { if (!Editor.deleteSelectedPoint()) Store.deleteSelection(); });
     $('selClear').addEventListener('click', () => Store.clearSelection());
     UI.dropdown($('btnDrive'), () => App.Drive.menuItems());
     updateThemeButton();
@@ -657,13 +657,19 @@
       items.push({ sep: true }, { label: $t('Sil'), icon: 'trash', shortcut: 'Del', action: () => Store.deleteSelection() });
     } else if (kind === 'edge') {
       const e = Store.selectedEdges()[0];
+      const sp = Editor.selectedPoint;
+      if (e && sp && sp.edge === e.id) {
+        items.push({ label: $t('Bükülme noktasını sil'), icon: 'trash', shortcut: 'Del', action: () => Editor.removeEdgePoint(e.id, sp.i) }, { sep: true });
+      } else if (e && e.from !== e.to) {
+        items.push({ label: $t('Bükülme noktası ekle'), icon: 'plus', action: () => Editor.addEdgePoint(e.id, p) });
+      }
       if (e) {
         items.push(
           { label: $t('Etiketi düzenle'), icon: 'edit', action: () => Editor.startEdgeLabelEdit(e.id) },
           { label: $t('Tür'), submenu: Object.entries(App.UML.EDGE_TYPES).map(([k, m]) => ({ label: m.label, checked: e.type === k, action: () => Store.mutate(() => { e.type = k; }) })) },
           { label: $t('Rota'), submenu: [['', $t('Sekme varsayılanı')], ['orthogonal', $t('Dik')], ['straight', $t('Düz')], ['curved', $t('Eğri')]].map(([k, l]) => ({ label: l, checked: (e.routing || '') === k, action: () => Store.mutate(() => { if (k) e.routing = k; else delete e.routing; delete e.mid; }) })) },
           { label: $t('Yönü çevir'), icon: 'swap', action: () => Store.mutate(() => { [e.from, e.to] = [e.to, e.from]; const fs = e.fromSide, ts = e.toSide; delete e.fromSide; delete e.toSide; if (ts) e.fromSide = ts; if (fs) e.toSide = fs; }) },
-          { label: $t('Rotayı sıfırla'), action: () => Store.mutate(() => { delete e.mid; delete e.fromSide; delete e.toSide; }) },
+          { label: $t('Rotayı sıfırla'), action: () => Store.mutate(() => { delete e.mid; delete e.points; delete e.fromSide; delete e.toSide; }) },
           { sep: true },
           { label: $t('Sil'), icon: 'trash', shortcut: 'Del', action: () => Store.deleteSelection() });
       }
@@ -708,7 +714,7 @@
     if (mod && (k === '=' || k === '+')) { e.preventDefault(); Editor.zoomAt(1.2); return; }
     if (mod && k === '-') { e.preventDefault(); Editor.zoomAt(1 / 1.2); return; }
     if (mod) return;
-    if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); Store.deleteSelection(); return; }
+    if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); if (!Editor.deleteSelectedPoint()) Store.deleteSelection(); return; }
     if (k === 'Escape') { Store.clearSelection(); UI.closeMenus(); closePanes(); return; }
     if (k === 'F2' || k === 'Enter') {
       const n = Store.selectedNodes();

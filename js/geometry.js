@@ -202,6 +202,102 @@
     return simplify(pts);
   }
 
+  /* Bükülme noktalarından geçen dik rota: her nokta bir köşe olur
+     (noktaya hangi eksende gelindiyse diğer eksende ayrılır) */
+  function routeOrthVia(s, wps, t) {
+    const p1 = { x: s.x + s.dx * STUB, y: s.y + s.dy * STUB };
+    const p2 = { x: t.x + t.dx * STUB, y: t.y + t.dy * STUB };
+    const pts = [s, p1];
+    let cur = p1, axis = s.dx !== 0 ? 'h' : 'v';
+    // son sıfır olmayan parçanın ekseni ve yönü
+    const lastMove = (a, c, b) => {
+      for (const [u, v] of [[c, b], [a, c]]) {
+        if (Math.abs(v.x - u.x) > 0.5) return { axis: 'h', sign: Math.sign(v.x - u.x) };
+        if (Math.abs(v.y - u.y) > 0.5) return { axis: 'v', sign: Math.sign(v.y - u.y) };
+      }
+      return null;
+    };
+    wps.forEach((w, i) => {
+      let hFirst;
+      if (i === 0) {
+        // çıkış yönünde devam et; geri dönmek gerekiyorsa çıkışta dön
+        const dir = s.dx || s.dy;
+        const d = axis === 'h' ? w.x - cur.x : w.y - cur.y;
+        hFirst = (axis === 'h') === (d * dir >= 0);
+      } else hFirst = axis === 'v';
+      const c = hFirst ? { x: w.x, y: cur.y } : { x: cur.x, y: w.y };
+      pts.push(c, { x: w.x, y: w.y });
+      const m = lastMove(cur, c, w);
+      if (m) axis = m.axis;
+      cur = w;
+    });
+    // son nokta -> hedef çıkıntısı: tercihen köşe yap, hedefe ters yönden girmesin
+    const tAxis = t.dx !== 0 ? 'h' : 'v', tSign = -(t.dx || t.dy);
+    const ok = (c) => { const m = lastMove(cur, c, p2); return !m || m.axis !== tAxis || m.sign === tSign; };
+    const ch = { x: p2.x, y: cur.y }, cv = { x: cur.x, y: p2.y };
+    const pref = axis === 'v' ? ch : cv, alt = axis === 'v' ? cv : ch;
+    pts.push(ok(pref) || !ok(alt) ? pref : alt, p2, { x: t.x, y: t.y });
+    return simplify(pts);
+  }
+
+  /* Uçlardan ve bükülme noktalarından geçen eğri (Catmull-Rom -> kübik Bezier parçaları) */
+  function splineVia(s, wps, t) {
+    const P = [s, ...wps, t];
+    const n = P.length;
+    const tan = P.map((p, i) => {
+      if (i === 0 || i === n - 1) {
+        const q = P[i === 0 ? 1 : n - 2];
+        const k = Math.max(30, Math.min(160, Math.hypot(q.x - p.x, q.y - p.y) * 0.45)) * 3;
+        return i === 0 ? { x: s.dx * k, y: s.dy * k } : { x: -t.dx * k, y: -t.dy * k };
+      }
+      return { x: (P[i + 1].x - P[i - 1].x) / 2, y: (P[i + 1].y - P[i - 1].y) / 2 };
+    });
+    const segs = [];
+    for (let i = 0; i < n - 1; i++) {
+      segs.push({
+        a: P[i], b: P[i + 1],
+        c1: { x: P[i].x + tan[i].x / 3, y: P[i].y + tan[i].y / 3 },
+        c2: { x: P[i + 1].x - tan[i + 1].x / 3, y: P[i + 1].y - tan[i + 1].y / 3 },
+      });
+    }
+    return segs;
+  }
+  function bezierAt(sg, k) {
+    const m = 1 - k;
+    return {
+      x: m * m * m * sg.a.x + 3 * m * m * k * sg.c1.x + 3 * m * k * k * sg.c2.x + k * k * k * sg.b.x,
+      y: m * m * m * sg.a.y + 3 * m * m * k * sg.c1.y + 3 * m * k * k * sg.c2.y + k * k * k * sg.b.y,
+    };
+  }
+
+  /* Bir noktanın çoklu çizgi üzerindeki en yakın izdüşümü (fromSeg: aramaya bu parçadan başla) */
+  function projectOnPoly(pts, p, fromSeg) {
+    let best = null, acc = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const L = Math.hypot(b.x - a.x, b.y - a.y);
+      if (i >= (fromSeg || 1)) {
+        const k = L ? Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / (L * L))) : 0;
+        const q = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+        const d = Math.hypot(p.x - q.x, p.y - q.y);
+        if (!best || d < best.d - 1e-6) best = { x: q.x, y: q.y, d, along: acc + L * k, seg: i };
+      }
+      acc += L;
+    }
+    return best;
+  }
+  /* Çizgide p noktasına eklenecek bükülme noktasının points dizisindeki sırası */
+  function bendInsertIndex(pts, wps, p) {
+    const at = projectOnPoly(pts, p).along;
+    let seg = 1, i = 0;
+    for (; i < wps.length; i++) {
+      const pr = projectOnPoly(pts, wps[i], seg);
+      if (!pr || pr.along >= at) break;
+      seg = pr.seg;
+    }
+    return i;
+  }
+
   function polyLength(pts) {
     let L = 0;
     for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
@@ -315,28 +411,33 @@
       } else {
         s = anchor(it.a, it.ba, it.fs, it.ft == null ? 0.5 : it.ft);
         t = anchor(it.b, it.bb, it.ts, it.tt == null ? 0.5 : it.tt);
-        if (routing === 'straight') pts = e.mid ? [s, e.mid, t] : [s, t];
+        // bükülme noktaları varsa orta tutamaç (mid) yok sayılır
+        const wps = Array.isArray(e.points) && e.points.length ? e.points : null;
+        if (routing === 'straight') pts = wps ? [s, ...wps, t] : e.mid ? [s, e.mid, t] : [s, t];
         else if (routing === 'curved') {
-          const dist = Math.hypot(t.x - s.x, t.y - s.y);
-          const k = Math.max(30, Math.min(160, dist * 0.45));
-          curve = { s, c1: { x: s.x + s.dx * k, y: s.y + s.dy * k }, c2: { x: t.x + t.dx * k, y: t.y + t.dy * k }, t };
+          if (wps) curve = splineVia(s, wps, t);
+          else {
+            const dist = Math.hypot(t.x - s.x, t.y - s.y);
+            const k = Math.max(30, Math.min(160, dist * 0.45));
+            curve = [{ a: s, c1: { x: s.x + s.dx * k, y: s.y + s.dy * k }, c2: { x: t.x + t.dx * k, y: t.y + t.dy * k }, b: t }];
+          }
           pts = [s, t];
-        } else pts = routeOrth(s, t, e.mid);
+        } else pts = wps ? routeOrthVia(s, wps, t) : routeOrth(s, t, e.mid);
       }
       const startDeco = meta.start || null, endDeco = meta.end || null;
       if (curve) {
-        d = `M${f(s.x)},${f(s.y)} C${f(curve.c1.x)},${f(curve.c1.y)} ${f(curve.c2.x)},${f(curve.c2.y)} ${f(t.x)},${f(t.y)}`;
-        startDir = unit(s, curve.c1); // yoldan uzağa
-        endDir = unit(curve.c2, t);
-        const bz = (k) => {
-          const m = 1 - k;
-          return {
-            x: m * m * m * s.x + 3 * m * m * k * curve.c1.x + 3 * m * k * k * curve.c2.x + k * k * k * t.x,
-            y: m * m * m * s.y + 3 * m * m * k * curve.c1.y + 3 * m * k * k * curve.c2.y + k * k * k * t.y,
-          };
-        };
-        labelPos = bz(0.5);
-        pts = [s, bz(0.25), labelPos, bz(0.75), t];
+        d = `M${f(s.x)},${f(s.y)}` + curve.map((sg) => ` C${f(sg.c1.x)},${f(sg.c1.y)} ${f(sg.c2.x)},${f(sg.c2.y)} ${f(sg.b.x)},${f(sg.b.y)}`).join('');
+        startDir = unit(s, curve[0].c1); // yoldan uzağa
+        endDir = unit(curve[curve.length - 1].c2, t);
+        if (curve.length === 1) {
+          labelPos = bezierAt(curve[0], 0.5);
+          pts = [s, bezierAt(curve[0], 0.25), labelPos, bezierAt(curve[0], 0.75), t];
+        } else {
+          // bükülme noktaları örnekler arasında tam olarak yer alır
+          pts = [s];
+          for (const sg of curve) for (let i = 1; i <= 8; i++) pts.push(i === 8 ? { x: sg.b.x, y: sg.b.y } : bezierAt(sg, i / 8));
+          labelPos = midPoint(pts);
+        }
       } else {
         startDir = unit(pts[0], pts[1]);
         endDir = unit(pts[pts.length - 2], pts[pts.length - 1]);
@@ -379,5 +480,5 @@
     return unionBounds(list);
   }
 
-  App.Geo = { CL, FLOW_FONT, FLOW_LINE, classLayout, nodeSize, bounds, center, unionBounds, flowTextLines, requiredHeight, textWidthFor, anchor, autoSides, nearestSide, sideFacing, computeEdges, hitNode, contentBounds, polyLength, pointAt, midPoint, roundedPath, SIDES, DIR, sideSpreads };
+  App.Geo = { CL, FLOW_FONT, FLOW_LINE, classLayout, nodeSize, bounds, center, unionBounds, flowTextLines, requiredHeight, textWidthFor, anchor, autoSides, nearestSide, sideFacing, computeEdges, hitNode, contentBounds, polyLength, pointAt, midPoint, roundedPath, projectOnPoly, bendInsertIndex, SIDES, DIR, sideSpreads };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -246,8 +246,9 @@
       field($t('Renk'), colorRow(e.color, (c) => { e.color = c || undefined; }))));
     out.push(section(null, h('div', { class: 'p-row wrap' },
       btn($t('Yönü çevir'), () => { Store.mutate(() => { [e.from, e.to] = [e.to, e.from]; [e.fromSide, e.toSide] = [e.toSide, e.fromSide]; [e.srcLabel, e.dstLabel] = [e.dstLabel, e.srcLabel]; if (!e.fromSide) delete e.fromSide; if (!e.toSide) delete e.toSide; }); App.Editor.requestRender(); render(); }, { icon: 'swap' }),
-      btn($t('Rotayı sıfırla'), () => { Store.mutate(() => { delete e.mid; delete e.fromSide; delete e.toSide; }); App.Editor.requestRender(); render(); }, { icon: 'routeOrth' }),
-      btn($t('Sil'), () => Store.deleteSelection(), { icon: 'trash', danger: true }))));
+      btn($t('Rotayı sıfırla'), () => { Store.mutate(() => { delete e.mid; delete e.points; delete e.fromSide; delete e.toSide; }); App.Editor.requestRender(); render(); }, { icon: 'routeOrth' }),
+      btn($t('Sil'), () => Store.deleteSelection(), { icon: 'trash', danger: true })),
+      h('ul', { class: 'p-tips' }, rich($t('Çizgiye **çift tıklayarak** bükülme noktası ekleyin; noktayı sürükleyerek taşıyın, çift tıklayarak ya da `Delete` ile silin.')))));
     return out;
   }
   function short(n) { return n.type === 'class' ? n.name : (n.text || UML.SHAPES[n.type].label).split('\n')[0]; }

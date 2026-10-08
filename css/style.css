@@ -193,6 +193,10 @@ body.palette-hidden .palette, body.panel-hidden .panel { display: none; }
 .ov-port:hover, .ov-port.active { fill: var(--accent); opacity: 1; }
 .ov-ehandle { fill: var(--canvas); stroke: var(--accent); cursor: grab; }
 .ov-ehandle.mid { fill: var(--accent); cursor: move; }
+.ov-ehandle.wp { cursor: move; }
+.ov-ehandle.wp.active, .ov-ehandle.wp:hover { fill: var(--accent); }
+#canvas .edge-wp { cursor: move; }
+#canvas .edge:hover .edge-wp { r: 4.5; }
 .ov-temp { stroke: var(--accent); fill: none; pointer-events: none; }
 .ov-temp-dot { fill: var(--accent); pointer-events: none; }
 .ov-marquee { fill: var(--accent-weak); stroke: var(--accent); pointer-events: none; }
@@ -421,6 +425,7 @@ select.input { padding: 0 6px; cursor: pointer; }
 .ov-port.out { fill: var(--accent); stroke: var(--canvas); opacity: .85; }
 .ov-port-stem { stroke: var(--accent); opacity: .6; pointer-events: none; }
 .touch .edge-hit { stroke-width: 26px; }
+.touch #canvas .edge-wp { r: 7; }
 .canvas-wrap.select-mode { box-shadow: inset 0 0 0 2px var(--ok); }
 .touch-only { display: none; }
 

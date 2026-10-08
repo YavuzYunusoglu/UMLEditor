@@ -20,10 +20,11 @@
   let inl = null;
   let clipboard = null;
   let pasteN = 0;
+  let selPt = null; // seçili bükülme noktası: { edge, i }
   // dokunmatik
   const pointers = new Map();
   let touchMode = false, selectMode = false;
-  let longTimer = null, lastTap = null, lastTouchAt = 0;
+  let longTimer = null, lastTap = null;
   const moveTol = () => (touchMode ? 8 : 3);
 
   const view = () => Store.tab.view;
@@ -122,6 +123,7 @@
       s += `<rect class="ov-sel" x="${b.x - p}" y="${b.y - p}" width="${b.w + 2 * p}" height="${b.h + 2 * p}" rx="${6 / z}" stroke-width="${sw}"/>`;
     }
     const T = touchMode;
+    const reconnecting = st && st.mode === 'ehandle' && (st.which === 'start' || st.which === 'end');
     const single = selNodes.length === 1 && !(st && (st.mode === 'connect' || st.mode === 'marquee' || st.mode === 'pinch')) && !busy ? selNodes[0] : null;
     if (single) {
       const b = Geo.bounds(single), hs = (T ? 15 : 8) / z;
@@ -141,27 +143,32 @@
         s += `<circle class="ov-port${active ? ' active' : ''}${off ? ' out' : ''}" data-port="${side}" data-node="${node.id}" cx="${cx}" cy="${cy}" r="${(active ? 6.5 : T ? 9 : 5) / z}" stroke-width="${sw}"/>`;
       }
     };
-    if (st && (st.mode === 'connect' || (st.mode === 'ehandle' && st.which !== 'mid'))) {
+    if (st && (st.mode === 'connect' || reconnecting)) {
       if (st.target) drawPorts(Store.node(st.target), 0);
     } else if (!st || st.mode === 'edgeclick') {
       if (hover && (!single || hover !== single.id) && Store.node(hover)) drawPorts(Store.node(hover), 0);
       if (single && single.type !== 'frame') drawPorts(single, (T ? 26 : 18) / z);
     }
     // seçili kenar tutamaçları
-    if (Store.sel.edges.size === 1 && !Store.sel.nodes.size && !(st && st.mode === 'ehandle' && st.which !== 'mid')) {
+    if (Store.sel.edges.size === 1 && !Store.sel.nodes.size && !reconnecting) {
       const id = [...Store.sel.edges][0];
-      const g = geom.get(id);
-      if (g) {
+      const g = geom.get(id), ed = Store.edge(id);
+      if (g && ed) {
         const r = (T ? 9 : 5) / z;
+        const wps = ed.from !== ed.to && Array.isArray(ed.points) ? ed.points : [];
         s += `<circle class="ov-ehandle" data-ehandle="start" cx="${g.start.x}" cy="${g.start.y}" r="${r}" stroke-width="${sw}"/>`;
         s += `<circle class="ov-ehandle" data-ehandle="end" cx="${g.end.x}" cy="${g.end.y}" r="${r}" stroke-width="${sw}"/>`;
-        if (g.routing !== 'curved') {
+        wps.forEach((w, i) => {
+          const on = selPt && selPt.edge === id && selPt.i === i;
+          s += `<circle class="ov-ehandle wp${on ? ' active' : ''}" data-ehandle="wp" data-wp="${i}" cx="${w.x}" cy="${w.y}" r="${(T ? 10 : 6) / z}" stroke-width="${sw}"/>`;
+        });
+        if (g.routing !== 'curved' && !wps.length) {
           const m = Geo.midPoint(g.pts), q = (T ? 9 : 5.5) / z;
           s += `<rect class="ov-ehandle mid" data-ehandle="mid" x="${m.x - q}" y="${m.y - q}" width="${2 * q}" height="${2 * q}" rx="${1.5 / z}" transform="rotate(45 ${m.x} ${m.y})" stroke-width="${sw}"/>`;
         }
       }
     }
-    if (st && (st.mode === 'connect' || (st.mode === 'ehandle' && st.which !== 'mid'))) {
+    if (st && (st.mode === 'connect' || reconnecting)) {
       let to = st.cur;
       if (st.target) {
         const tn = Store.node(st.target);
@@ -201,7 +208,6 @@
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
     if (isTouch !== touchMode) { touchMode = isTouch; wrap.classList.toggle('touch', isTouch); }
-    if (isTouch) lastTouchAt = Date.now();
     if (pointers.size >= 2) { capture(e); if (pointers.size === 2) startPinch(); return; }
     if (inl) commitInline();
     App.UI.closeMenus();
@@ -229,11 +235,17 @@
     const ehEl = t.closest('[data-ehandle]');
     const nodeEl = t.closest('[data-node]');
     const edgeEl = t.closest('[data-edge]');
+    const wpEl = t.closest('[data-wp]');
+    selPt = null;
     if (hEl) startResize(hEl.dataset.handle, p, e);
     else if (portEl) startConnect(portEl.dataset.node, portEl.dataset.port, p);
-    else if (ehEl) startEdgeHandle(ehEl.dataset.ehandle, p);
+    else if (ehEl) startEdgeHandle(ehEl.dataset.ehandle, p, wpEl ? +wpEl.dataset.wp : -1);
     else if (nodeEl) startNodeDrag(nodeEl.dataset.node, p, e);
-    else if (edgeEl) {
+    else if (wpEl && edgeEl) {
+      // seçili olmayan bir çizginin bükülme noktası: çizgiyi seç ve noktayı sürükle
+      Store.select([], [edgeEl.dataset.edge]);
+      startEdgeHandle('wp', p, +wpEl.dataset.wp);
+    } else if (edgeEl) {
       const id = edgeEl.dataset.edge;
       if (e.shiftKey || e.ctrlKey || e.metaKey || selectMode) {
         const s = new Set(Store.sel.edges);
@@ -268,7 +280,7 @@
   /* Devam eden etkileşimi değişiklik bırakmadan sonlandır */
   function cancelInteraction() {
     if (!st) return;
-    if (st.mode === 'drag' || st.mode === 'resize' || (st.mode === 'ehandle' && st.which === 'mid')) Store.end();
+    if (st.mode === 'drag' || st.mode === 'resize' || (st.mode === 'ehandle' && (st.which === 'mid' || st.which === 'wp'))) Store.end();
     st = null;
     renderOverlay();
   }
@@ -297,16 +309,17 @@
     renderOverlay();
   }
 
-  function handleTap(s, e) {
-    // çift dokunuş = çift tıklama
+  /* Çift tıklama / çift dokunuşu kendimiz algılıyoruz: onDown tuvali yeniden çizdiği için basılan öğe
+     DOM'dan kalkar ve tarayıcının dblclick'i ya hiç gelmez ya da svg'ye gelir */
+  function handleTap(s, e, isTouch) {
     const now = Date.now();
-    if (lastTap && now - lastTap.t < 380 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+    if (lastTap && lastTap.touch === isTouch && now - lastTap.t < (isTouch ? 380 : 500) && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < (isTouch ? 30 : 6)) {
       lastTap = null;
       const target = document.elementFromPoint(e.clientX, e.clientY) || svg;
-      onDblClick({ target, clientX: e.clientX, clientY: e.clientY, synthetic: true });
+      onDblClick({ target, clientX: e.clientX, clientY: e.clientY });
       return;
     }
-    lastTap = { t: now, x: e.clientX, y: e.clientY };
+    lastTap = { t: now, x: e.clientX, y: e.clientY, touch: isTouch };
     if (s.mode === 'tpan') Store.clearSelection();
   }
 
@@ -337,8 +350,9 @@
     const orig = new Map();
     for (const nid of ids) { const n = Store.node(nid); if (n) orig.set(nid, { x: n.x, y: n.y }); }
     const edgeMids = tab.edges.filter((ed) => ed.mid && ids.has(ed.from) && ids.has(ed.to)).map((ed) => ({ e: ed, x: ed.mid.x, y: ed.mid.y }));
+    const edgePts = tab.edges.filter((ed) => Array.isArray(ed.points) && ids.has(ed.from) && ids.has(ed.to)).map((ed) => ({ e: ed, pts: ed.points.map((q) => ({ x: q.x, y: q.y })) }));
     Store.begin();
-    st = { mode: 'drag', id, start: p, orig, edgeMids, moved: false, clickedSel: wasSel && !multi, toggleOff, ids };
+    st = { mode: 'drag', id, start: p, orig, edgeMids, edgePts, moved: false, clickedSel: wasSel && !multi, toggleOff, ids };
   }
 
   function startResize(handle, p, e) {
@@ -356,13 +370,15 @@
     st = { mode: 'connect', from: nodeId, side, fixed: { x: a.x, y: a.y }, cur: p, target: null, targetSide: null, moved: false };
   }
 
-  function startEdgeHandle(which, p) {
+  function startEdgeHandle(which, p, wp) {
     const id = [...Store.sel.edges][0];
     const e = Store.edge(id), g = geom.get(id);
     if (!e || !g) return;
-    if (which === 'mid') {
+    if (which === 'wp' && !(e.points && e.points[wp])) return;
+    if (which === 'mid' || which === 'wp') {
+      if (which === 'wp') selPt = { edge: id, i: wp };
       Store.begin();
-      st = { mode: 'ehandle', which, id, moved: false };
+      st = { mode: 'ehandle', which, id, wp, start: p, moved: false };
       return;
     }
     st = { mode: 'ehandle', which, id, fixed: which === 'start' ? g.end : g.start, cur: p, target: null, targetSide: null, moved: false };
@@ -447,6 +463,7 @@
         dx = nx - prim.x; dy = ny - prim.y;
         for (const [nid, o] of st.orig) { const m = Store.node(nid); if (m) { m.x = Math.round(o.x + dx); m.y = Math.round(o.y + dy); } }
         for (const em of st.edgeMids) em.e.mid = { x: em.x + dx, y: em.y + dy };
+        for (const ep of st.edgePts) ep.e.points = ep.pts.map((q) => ({ x: Math.round(q.x + dx), y: Math.round(q.y + dy) }));
         requestRender();
         break;
       }
@@ -483,11 +500,15 @@
         break;
       }
       case 'ehandle': {
-        st.moved = true;
-        if (st.which === 'mid') {
+        if (st.which === 'mid' || st.which === 'wp') {
+          // dokunuştaki küçük titremeler sürükleme sayılmasın (çift dokunuş algılanabilsin)
+          if (!st.moved && Math.hypot(p.x - st.start.x, p.y - st.start.y) * z < moveTol()) return;
+          st.moved = true;
           const ed = Store.edge(st.id);
-          if (ed) { ed.mid = { x: snapOn(e) ? sn(p.x) : p.x, y: snapOn(e) ? sn(p.y) : p.y }; requestRender(); }
+          if (ed && st.which === 'mid') { ed.mid = { x: snapOn(e) ? sn(p.x) : p.x, y: snapOn(e) ? sn(p.y) : p.y }; requestRender(); }
+          else if (ed && ed.points && ed.points[st.wp]) { ed.points[st.wp] = snapBendPoint(ed, st.wp, p, e); requestRender(); }
         } else {
+          st.moved = true;
           st.cur = p;
           updateHoverTarget(p, null);
           renderOverlay();
@@ -525,8 +546,9 @@
     wrap.classList.remove('panning');
     const isTouch = e.pointerType === 'touch' || e.pointerType === 'pen';
     // seçim modunda dokunuşlar seçimi değiştirir; çift dokunuşla düzenleme açılmaz
-    if (isTouch && e.type === 'pointerup' && !s.moved && !selectMode && (s.mode === 'drag' || s.mode === 'edgeclick' || s.mode === 'tpan')) handleTap(s, e);
-    else if (isTouch) lastTap = null;
+    const tappable = s.mode === 'drag' || s.mode === 'edgeclick' || s.mode === 'tpan' || s.mode === 'marquee' || (s.mode === 'ehandle' && (s.which === 'mid' || s.which === 'wp'));
+    if (e.type === 'pointerup' && !s.moved && !selectMode && tappable) handleTap(s, e, isTouch);
+    else lastTap = null;
     switch (s.mode) {
       case 'rpan':
         if (!s.moved) openContextMenu(s.target, e.clientX, e.clientY, s.p);
@@ -544,7 +566,7 @@
         break;
       case 'connect': finishConnect(s); break;
       case 'ehandle':
-        if (s.which === 'mid') Store.end();
+        if (s.which === 'mid' || s.which === 'wp') Store.end();
         else if (s.target) {
           const ed = Store.edge(s.id);
           if (ed) {
@@ -605,13 +627,17 @@
 
   function onDblClick(e) {
     if (App.UI.topModal()) return;
-    // dokunmatikte çift dokunuşu kendimiz algılıyoruz; tarayıcının ürettiği dblclick'i yok say
-    if (!e.synthetic && Date.now() - lastTouchAt < 1000) return;
     const p = toWorld(e.clientX, e.clientY);
     const nodeEl = e.target.closest('[data-node]');
     const edgeEl = e.target.closest('[data-edge]');
+    const ehEl = e.target.closest('[data-ehandle]');
+    const wpEl = e.target.closest('[data-wp]');
     if (e.target.closest('[data-port]') || e.target.closest('[data-handle]')) return;
-    if (nodeEl) {
+    if (wpEl) {
+      // bükülme noktasına çift tık: noktayı sil
+      const id = edgeEl ? edgeEl.dataset.edge : [...Store.sel.edges][0];
+      if (id) removeEdgePoint(id, +wpEl.dataset.wp);
+    } else if (nodeEl) {
       const n = Store.node(nodeEl.dataset.node);
       if (!n) return;
       let field = null;
@@ -622,9 +648,13 @@
       }
       Store.select([n.id], []);
       startInlineEdit(n.id, field);
-    } else if (edgeEl || e.target.closest('[data-ehandle]')) {
+    } else if (edgeEl || ehEl) {
       const id = edgeEl ? edgeEl.dataset.edge : [...Store.sel.edges][0];
-      if (id) { Store.select([], [id]); startEdgeLabelEdit(id); }
+      if (!id) return;
+      Store.select([], [id]);
+      // çizginin kendisine (ya da orta tutamaca) çift tık: bükülme noktası ekle; etikete / uç tutamaçlara: etiketi düzenle
+      const onLine = !e.target.closest('.edge-label') && !(ehEl && ehEl.dataset.ehandle !== 'mid');
+      if (!onLine || !addEdgePoint(id, p)) startEdgeLabelEdit(id);
     } else if (Editor.onCanvasDblClick) Editor.onCanvasDblClick(p, e);
   }
 
@@ -657,8 +687,75 @@
       if (!Store.sel.edges.has(id)) Store.select([], [id]);
       kind = 'edge';
     }
+    // bükülme noktasının üzerinde açıldıysa menü o noktayı silmeyi önerir
+    const wpEl = target && target.closest && target.closest('[data-wp]');
+    selPt = null;
+    if (wpEl && Store.sel.edges.size === 1) {
+      kind = 'edge';
+      selPt = { edge: edgeEl ? edgeEl.dataset.edge : [...Store.sel.edges][0], i: +wpEl.dataset.wp };
+    }
     requestRender();
     if (Editor.onContextMenu) Editor.onContextMenu(kind, cx, cy, p);
+  }
+
+  /* ---------------- Bükülme noktaları ---------------- */
+  /* Sürüklenen noktayı komşularıyla (önceki/sonraki nokta ya da çizgi ucu) hizala, yoksa ızgaraya oturt */
+  function snapBendPoint(ed, i, p, e) {
+    st.guides = null;
+    if (!snapOn(e)) return { x: Math.round(p.x), y: Math.round(p.y) };
+    const g = geom.get(ed.id);
+    const prev = i > 0 ? ed.points[i - 1] : g && g.start;
+    const next = i < ed.points.length - 1 ? ed.points[i + 1] : g && g.end;
+    const tol = 8 / view().zoom;
+    let ax = null, ay = null;
+    for (const q of [prev, next]) {
+      if (!q) continue;
+      if (Math.abs(q.x - p.x) < tol && (!ax || Math.abs(q.x - p.x) < Math.abs(ax.x - p.x))) ax = q;
+      if (Math.abs(q.y - p.y) < tol && (!ay || Math.abs(q.y - p.y) < Math.abs(ay.y - p.y))) ay = q;
+    }
+    const x = ax ? ax.x : sn(p.x), y = ay ? ay.y : sn(p.y);
+    const guides = [];
+    if (ax) guides.push({ x, y1: Math.min(y, ax.y) - 10, y2: Math.max(y, ax.y) + 10 });
+    if (ay) guides.push({ y, x1: Math.min(x, ay.x) - 10, x2: Math.max(x, ay.x) + 10 });
+    st.guides = guides.length ? guides : null;
+    return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+  }
+
+  /* Çizginin p noktasına en yakın yerine bükülme noktası ekle */
+  function addEdgePoint(id, p) {
+    const ed = Store.edge(id), g = geom.get(id);
+    if (!ed || !g || ed.from === ed.to) return false;
+    const wps = Array.isArray(ed.points) ? ed.points : [];
+    const i = Geo.bendInsertIndex(g.pts, wps, p);
+    // nokta tam çizginin üzerine konur; sürüklenince ızgaraya oturur
+    const q = Geo.projectOnPoly(g.pts, p) || p;
+    Store.mutate(() => {
+      ed.points = wps.slice();
+      ed.points.splice(i, 0, { x: Math.round(q.x), y: Math.round(q.y) });
+      delete ed.mid;
+    });
+    Store.select([], [id]);
+    selPt = { edge: id, i };
+    renderOverlay();
+    return true;
+  }
+
+  function removeEdgePoint(id, i) {
+    const ed = Store.edge(id);
+    if (!ed || !Array.isArray(ed.points) || !ed.points[i]) return false;
+    Store.mutate(() => {
+      ed.points = ed.points.filter((q, k) => k !== i);
+      if (!ed.points.length) delete ed.points;
+    });
+    selPt = null;
+    Store.select([], [id]);
+    return true;
+  }
+
+  /* Seçili bükülme noktasını sil (Delete tuşu) */
+  function deleteSelectedPoint() {
+    if (!selPt || !Store.sel.edges.has(selPt.edge)) return false;
+    return removeEdgePoint(selPt.edge, selPt.i);
   }
 
   /* ---------------- Satır içi düzenleme ---------------- */
@@ -902,7 +999,7 @@
     const before = Geo.unionBounds(nodes.filter((n) => n.type !== 'frame').map(Geo.bounds));
     Store.mutate(() => {
       App.Layout.layered(nodes, edges, { direction, reverse: new Set(['inheritance', 'realization']), originX: before ? sn(before.x) : 0, originY: before ? sn(before.y) : 0 });
-      edges.forEach((e) => { delete e.mid; });
+      edges.forEach((e) => { delete e.mid; delete e.points; });
     });
     renderNow();
     fitView(useSel ? ids : null);
@@ -928,7 +1025,6 @@
     svg.addEventListener('pointerup', onUp);
     svg.addEventListener('pointercancel', onUp);
     svg.addEventListener('pointerleave', () => { if (!st && hover) { hover = null; renderOverlay(); } });
-    svg.addEventListener('dblclick', onDblClick);
     svg.addEventListener('wheel', onWheel, { passive: false });
     svg.addEventListener('contextmenu', (e) => e.preventDefault());
     inlineEl.addEventListener('keydown', onInlineKey);
@@ -965,7 +1061,7 @@
 
     Store.on('change', () => requestRender());
     Store.on('selection', () => requestRender());
-    Store.on('tab', () => { hover = null; if (inl) commitInline(true); applyView(); renderNow(); });
+    Store.on('tab', () => { hover = null; selPt = null; if (inl) commitInline(true); applyView(); renderNow(); });
     App.Theme && Store.on('theme', () => renderNow());
   }
 
@@ -978,6 +1074,7 @@
   const Editor = App.Editor = {
     init, renderNow, requestRender, renderOverlay, applyView, fitView, zoomAt, setZoom, viewCenterWorld, toWorld,
     startInlineEdit, startEdgeLabelEdit, commitInline, get editing() { return !!inl; },
+    addEdgePoint, removeEdgePoint, deleteSelectedPoint, get selectedPoint() { return selPt; },
     selectAll, copy, cut, paste, duplicate, insertItem, insertFragment, nudge, align, distribute, reorder, autoLayout,
     settings, setSetting, isTyping, GRID, SNAP,
     get touchMode() { return touchMode; },

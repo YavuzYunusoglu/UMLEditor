@@ -146,6 +146,10 @@
     s += `<path d="${g.d}" fill="none" stroke="${color}" stroke-width="${selected ? 2.2 : 1.6}"${g.dash ? ' stroke-dasharray="7 5"' : ''} stroke-linejoin="round" stroke-linecap="round"/>`;
     s += deco(g.endDeco, g.end, g.endDir, color, T);
     s += deco(g.startDeco, g.start, { x: -g.startDir.x, y: -g.startDir.y }, color, T);
+    // bükülme noktaları yalnızca tuvalde görünür (dışa aktarımda yok)
+    if (live && Array.isArray(e.points) && e.from !== e.to) {
+      e.points.forEach((p, i) => { s += `<circle class="edge-wp" data-wp="${i}" cx="${f(p.x)}" cy="${f(p.y)}" r="3.5" fill="${T.canvas}" stroke="${color}" stroke-width="1.5"/>`; });
+    }
     return s + '</g>';
   }
 

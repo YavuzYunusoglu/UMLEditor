@@ -97,6 +97,7 @@ Connection behaviour:
 - Click a connection to change its type, labels, multiplicities, routing (right-angle, straight or curved) and line style in the right panel.
 - Drag the diamond handle in the middle of a selected line to reroute it.
 - Drag a line's end handles to attach it to a different shape.
+- **Double-click** a line to add a **bend point**; the line passes through it (on right-angle routes it becomes a corner). Drag the point to move it (it aligns with its neighbours), and double-click it or select it and press `Delete` to remove it. **Reset route** removes all bend points.
 
 ### 3. Editing classes and Unity shortcuts
 
@@ -190,7 +191,7 @@ Google access tokens last about an hour. When yours expires, the indicator shows
 | Drag a shape | Move it |
 | Drag empty canvas | Pan |
 | Two fingers | Pinch to zoom, and pan |
-| Double-tap | Edit text (on empty canvas: quick add) |
+| Double-tap | Edit text (on empty canvas: quick add; on a line: add a bend point; on a bend point: remove it) |
 | Long-press | Context menu (*Properties* opens the side panel) |
 | Drag a blue dot around a selected shape | Draw a connection |
 | **Select** button on the canvas | Multi-select mode: tap to add or remove shapes, drag on empty canvas to box-select |

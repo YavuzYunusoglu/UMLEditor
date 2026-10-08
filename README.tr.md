@@ -97,6 +97,7 @@ Bağlantıların davranışı:
 - Bir bağlantıya tıklayınca sağ panelden türünü, etiketlerini, çokluklarını, rotasını (dik, düz, eğri) ve çizgi stilini değiştirebilirsiniz.
 - Seçili bir çizginin ortasındaki baklava tutamacını sürükleyerek rotasını değiştirebilirsiniz.
 - Çizginin uç tutamaçlarını sürükleyerek onu başka bir şekle bağlayabilirsiniz.
+- Çizginin üzerine **çift tıklayarak** bir **bükülme noktası** ekleyebilirsiniz; çizgi bu noktadan geçer (dik rotada nokta köşe olur). Noktayı sürükleyerek taşıyın (komşu noktalarla hizalanır), noktaya çift tıklayarak ya da seçip `Delete` ile silin. **Rotayı sıfırla** tüm noktaları kaldırır.
 
 ### 3. Sınıfları düzenleme ve Unity kısayolları
 
@@ -190,7 +191,7 @@ Google erişim anahtarı yaklaşık bir saat geçerlidir. Süresi dolunca göste
 | Şekli sürüklemek | Taşır |
 | Boş tuvali sürüklemek | Kaydırır |
 | İki parmak | Yakınlaştırır/uzaklaştırır ve kaydırır |
-| Çift dokunuş | Metni düzenler (boş alanda: hızlı ekleme) |
+| Çift dokunuş | Metni düzenler (boş alanda: hızlı ekleme; çizgide: bükülme noktası ekler; bükülme noktasında: siler) |
 | Uzun basış | Bağlam menüsü (*Özellikler* sağ paneli açar) |
 | Seçili şeklin etrafındaki mavi noktayı sürüklemek | Bağlantı çizer |
 | Tuvaldeki **Seç** düğmesi | Çoklu seçim modu: dokunarak seçime ekleyin/çıkarın, boş alanda sürükleyerek çerçeveyle seçin |
