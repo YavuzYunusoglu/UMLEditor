@@ -45,7 +45,25 @@
     return val;
   }
 
+  /* Yazı boyutu: düğüm temel ölçekte (13px) yerleşir, çizimde k kadar büyütülür.
+     Böylece her şekil türü aynı yolla büyür; genişlik dünyada sabit kalır, yükseklik metne göre artar. */
+  const BASE_FS = 13;
+  function fontScale(n) { const fs = +n.fs; return fs > 0 ? fs / BASE_FS : 1; }
+  const views = new WeakMap();
+  /* Düğümün temel ölçekteki görünümü (diğer alanlar canlı olarak düğümden okunur) */
+  function unscaled(n) {
+    const k = fontScale(n);
+    if (k === 1) return n;
+    let v = views.get(n);
+    if (!v) { v = Object.create(n); v.fs = 0; views.set(n, v); }
+    v.w = (+n.w || 0) / k;
+    v.h = (+n.h || 0) / k;
+    return v;
+  }
+
   function nodeSize(n) {
+    const k = fontScale(n);
+    if (k !== 1) { const s = nodeSize(unscaled(n)); return { w: s.w * k, h: s.h * k }; }
     if (n.type === 'class') { const l = classLayout(n); return { w: l.w, h: l.h }; }
     if (App.Dialogue && App.Dialogue.isDlg(n)) { const l = App.Dialogue.layout(n); return { w: l.w, h: l.h }; }
     return { w: n.w, h: n.h };
@@ -74,6 +92,8 @@
   }
   function flowTextLines(n) { return U.wrapText(n.text || '', FLOW_FONT, Math.max(20, textWidthFor(n))); }
   function requiredHeight(n) {
+    const k = fontScale(n);
+    if (k !== 1) return Math.ceil(requiredHeight(unscaled(n)) * k);
     const lines = flowTextLines(n).length;
     const extra = n.type === 'decision' ? 2.1 : 1;
     return Math.ceil((lines * FLOW_LINE) * extra + (n.type === 'decision' ? 20 : 18));
@@ -481,5 +501,26 @@
     return unionBounds(list);
   }
 
-  App.Geo = { CL, FLOW_FONT, FLOW_LINE, classLayout, nodeSize, bounds, center, unionBounds, flowTextLines, requiredHeight, textWidthFor, anchor, autoSides, nearestSide, sideFacing, computeEdges, hitNode, contentBounds, polyLength, pointAt, midPoint, roundedPath, projectOnPoly, bendInsertIndex, SIDES, DIR, sideSpreads };
+  /* Yazı büyüyünce metnin sığması için yüksekliği ayarlanan akış şekilleri */
+  function fitsText(n) { return n.type !== 'class' && n.type !== 'frame' && n.type !== 'connector' && !(UML.SHAPES[n.type] || {}).dlg; }
+  function fitText(n) { if (fitsText(n) && n.text) n.h = Math.max(n.h, requiredHeight(n)); }
+  /* Yazı boyutunu değiştir: şekil orantılı büyür / küçülür (yükseklik içerikten gelen düğümlerde yalnızca genişlik) */
+  function setFontSize(n, fs, explicit) {
+    const r = fs / (+n.fs || BASE_FS);
+    const before = nodeSize(n);
+    if (fs === BASE_FS && !explicit) delete n.fs; else n.fs = fs;
+    if (r !== 1 && n.type !== 'frame') {
+      if (+n.w) n.w = Math.round(n.w * r);
+      if (fitsText(n) || n.type === 'connector') n.h = Math.round(n.h * r);
+    }
+    fitText(n);
+    // merkezi yerinde kalsın
+    if (n.type !== 'frame') {
+      const after = nodeSize(n);
+      n.x = Math.round(n.x - (after.w - before.w) / 2);
+      n.y = Math.round(n.y - (after.h - before.h) / 2);
+    }
+  }
+
+  App.Geo = { BASE_FS, fontScale, unscaled, fitText, fitsText, setFontSize, CL, FLOW_FONT, FLOW_LINE, classLayout, nodeSize, bounds, center, unionBounds, flowTextLines, requiredHeight, textWidthFor, anchor, autoSides, nearestSide, sideFacing, computeEdges, hitNode, contentBounds, polyLength, pointAt, midPoint, roundedPath, projectOnPoly, bendInsertIndex, SIDES, DIR, sideSpreads };
 })(typeof window !== 'undefined' ? window : globalThis);

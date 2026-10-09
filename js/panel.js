@@ -96,6 +96,28 @@
     return h('button', { class: 'icon-btn', title, html: icon(ic, 16), onclick: onClick });
   }
 
+  /* ---- Yazı boyutu ---- */
+  const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 40, 48];
+  const fsOpts = (extra) => extra.concat(FONT_SIZES.map((v) => ({ value: String(v), label: v + ' px' })));
+  /* Seçili şekillerin yazı boyutu */
+  function fontField(nodes) {
+    const def = Store.tab.fontSize || Geo.BASE_FS;
+    const vals = new Set(nodes.map((n) => n.fs || def));
+    const cur = vals.size === 1 ? String([...vals][0]) : '';
+    return field($t('Yazı boyutu'), select(fsOpts(cur ? [] : [{ value: '', label: '\u2014' }]), cur, (v) => {
+      if (!v) return;
+      for (const n of nodes) Geo.setFontSize(n, +v, true);
+    }));
+  }
+  /* Sekmenin yazı boyutu: tüm şekillere, bağlantı etiketlerine ve sonradan eklenenlere uygulanır */
+  function tabFontField(tab) {
+    return field($t('Yazı boyutu'), select(fsOpts([]), String(tab.fontSize || Geo.BASE_FS), (v) => {
+      const fs = +v;
+      if (fs === Geo.BASE_FS) delete tab.fontSize; else tab.fontSize = fs;
+      for (const n of tab.nodes) Geo.setFontSize(n, fs, fs !== Geo.BASE_FS);
+    }), $t('Sekmedeki tüm şekillere ve bağlantı etiketlerine uygulanır. Tek bir şeklin boyutunu kendi panelinden değiştirebilirsiniz.'));
+  }
+
   /* ---- Görünümler ---- */
   function renderDocument() {
     const tab = Store.tab;
@@ -109,6 +131,7 @@
         { value: 'straight', label: $t('Düz'), icon: 'routeStraight' },
         { value: 'curved', label: $t('Eğri'), icon: 'routeCurve' },
       ], tab.routing || 'orthogonal', (v) => { tab.routing = v; })),
+      tabFontField(tab),
       h('div', { class: 'p-stats' },
         stat(nClass, $t('sınıf')), stat(nFlow, $t('şekil')), stat(tab.edges.length, $t('bağlantı')))));
     out.push(section($t('Belge'),
@@ -142,7 +165,8 @@
       h('div', { class: 'p-row' },
         checkbox($t('Soyut (abstract)'), n.abstract, (v) => { n.abstract = v; }),
         checkbox($t('Üyeleri göster'), n.showMembers !== false, (v) => { n.showMembers = v; })),
-      field('Namespace', textInput(n.namespace, (v) => { n.namespace = v; }, { mono: true, placeholder: $t('Game.Core (isteğe bağlı)') }))));
+      field('Namespace', textInput(n.namespace, (v) => { n.namespace = v; }, { mono: true, placeholder: $t('Game.Core (isteğe bağlı)') })),
+      fontField([n])));
 
     const isEnum = String(n.stereotype).toLowerCase() === 'enum';
     const attrArea = textArea(n.attributes, (v) => { n.attributes = v; }, { mono: true, rows: Math.min(12, Math.max(3, UML.splitLines(n.attributes).length + 1)), placeholder: isEnum ? 'Idle\nRun\nJump' : '- speed : float = 5f\n+ Health : int {get; private set;}' });
@@ -194,6 +218,7 @@
         App.Editor.requestRender(); render();
       }, { icon: 'fit' }));
     }
+    children.push(fontField([n]));
     out.push(section(title, ...children));
     out.push(section($t('Renk'), colorRow(n.color, (c) => { n.color = c || undefined; })));
     out.push(nodeActions());
@@ -296,6 +321,7 @@
         iconBtn('layout', $t('Seçimi otomatik yerleştir'), () => App.Editor.autoLayout('TB')))));
     if (nodes.length) {
       out.push(section($t('Renk (tümü)'), colorRow('', (c) => { for (const n of nodes) n.color = c || undefined; })));
+      out.push(section(null, fontField(nodes)));
     }
     const classes = nodes.filter((n) => n.type === 'class');
     const actions = [
@@ -328,8 +354,8 @@
     Store.on('selection', render);
     Store.on('tab', render);
     Store.on('load', render);
-    Store.on('change', () => { if (!root.contains(document.activeElement)) render(); });
+    Store.on('change', () => setTimeout(() => { if (!root.contains(document.activeElement)) render(); }, 0));
   }
 
-  App.Panel = { init, render, kit: { section, field, textInput, numInput, textArea, checkbox, select, segmented, colorRow, btn, iconBtn, rich, stat, nodeActions, bindTx } };
+  App.Panel = { init, render, kit: { fontField, tabFontField, section, field, textInput, numInput, textArea, checkbox, select, segmented, colorRow, btn, iconBtn, rich, stat, nodeActions, bindTx } };
 })(window);

@@ -50,7 +50,7 @@ A free, offline-first **UML class diagram and flowchart editor** for the browser
 |---|---|
 | **Class diagrams** | Classes, abstract classes, interfaces, enums, structs, notes and packages/groups. There are seven relationship types (association, inheritance, realization, dependency, aggregation, composition, link) with multiplicity labels. |
 | **Flowcharts** | Start/end, process, decision, input/output, loop (preparation), subprocess, document, connector and free text. |
-| **Game dialogues** | A node editor for narrative designers: lines, player choices, conditions, actions/events and jumps, with shared characters and variables. Problems are checked live, a playtest preview runs the dialogue like the game would, and **Dialogue JSON** export comes with matching Unity C# data classes. |
+| **Game dialogues** | A node editor for narrative designers: lines, player choices, conditions, actions/events and jumps, with shared characters and variables. A character page holds portraits, Markdown descriptions and properties, and characters can be placed on the canvas as character cards. Problems are checked live, a playtest preview runs the dialogue like the game would, and **Dialogue JSON** export comes with matching Unity C# data classes. |
 | **Unity shortcuts** | One-click MonoBehaviour, ScriptableObject, Singleton, `[Serializable]`, Custom Editor, EditorWindow, StateMachineBehaviour and more. It also includes ready-made **design patterns**, **loop/flow templates** and menus for **Unity messages and fields**. |
 | **C# export** | Unity-ready `.cs` files in a `.zip`, including `[SerializeField]`, `[CreateAssetMenu]`, `[CustomEditor]`, singleton boilerplate, interface stubs, and an `Editor/` folder for editor scripts. |
 | **C# import** | Drop `.cs` files or a whole `Assets/Scripts` folder to get a class diagram. Fields, properties, methods, inheritance and references are detected automatically. |
@@ -59,7 +59,7 @@ A free, offline-first **UML class diagram and flowchart editor** for the browser
 | **Themes** | Dark and light. |
 | **Google Drive** | Optional sync to your own Drive, with conflict detection between devices. |
 | **Works everywhere** | Desktop, tablet and phone. You can install it to the home screen, and it opens offline. |
-| **Editor comforts** | Multiple tabs, undo/redo, copy/paste, alignment guides, snap-to-grid, auto-layout and autosave in the browser. |
+| **Editor comforts** | Adjustable font size per tab or per shape, multiple tabs, undo/redo, copy/paste, alignment guides, snap-to-grid, auto-layout and autosave in the browser. |
 
 ---
 
@@ -247,6 +247,10 @@ Working with dialogues:
 - **Characters and variables** are listed in the properties panel when nothing is selected. Characters are shared by every dialogue tab in the document. Variables are the game state that conditions and actions use (true/false, number or text), each with a default value.
 - **Fast writing:** drag from the dot on a node's edge into empty space to create the next line. The app guesses the speaker by alternating between the two characters who are talking. In the panel, **Add next** adds a line, choice, condition, action or end after the selected node. If the node already has a next step, the button becomes **Insert after**: the new node goes in between and the nodes below move down to make room.
 - **Double-click** a line's text to write it, its header to change the speaker, or an option row of a choice to edit that option.
+- **Character page:** the **Characters** button in the tab bar (on dialogue tabs) opens a separate page for the cast. Each character has a portrait, colour, ID, role/title, a description written in Markdown with a live preview, and free-form properties (age, goal, fear, speech style… or anything you add). The page also lists every line the character speaks.
+- **Character cards:** on a dialogue tab the palette has a **Characters** section. Drag a character onto the canvas (or use **Add to scene** on the character page) to place a character card that shows the portrait, role, description and properties. Cards update when you edit the character. Drag from a card's edge into empty space to start a new line spoken by that character.
+- **Markdown:** lines, choice options and the character page support `**bold**`, `*italic*`, `` `code` ``, `~~strikethrough~~`, `# headings`, `- lists` and `> quotes`. They are rendered on the canvas and in the preview, but the JSON export contains plain text without the Markdown marks.
+- **Font size:** with nothing selected, the properties panel has a **Font size** setting for the whole tab (shapes, connection labels and shapes you add later). Selected shapes have their own **Font size** setting. This works for class diagrams and flowcharts too. Shapes grow around their centre, so you may want to run **Layout** afterwards.
 - **Checks:** problems such as unconnected options, missing speakers, condition syntax errors, undeclared variables, unreachable nodes and duplicate IDs are marked with a badge on the node and listed in the panel. Click a problem to jump to the node.
 - **Play:** the **Play** button opens a preview that runs the dialogue the way the game would. While it runs you can change variables, pick options with the number keys, see locked options and why they are locked, and jump from any message back to its node on the canvas.
 
@@ -284,6 +288,8 @@ DialogueNode node = d.Find(d.start);
 ```
 
 The game then walks the nodes. For a `line`, show it and go to `next`. For a `choice`, show the options whose `condition` holds. For a `condition`, evaluate it and go to `ifTrue` or `ifFalse`. Apply the `actions` of an `action` node, switch to another dialogue on `jump`, and stop at `end` or when `next` is empty. Conditions use `== != < > <= >=`, `and or not` (or `&& || !`), numbers, `"strings"`, `true` / `false` and variable names.
+
+Character cards and the character page details (portrait, role, description, properties) are design notes and are not exported; the JSON only lists each character's `id`, `name` and `color`.
 
 The dialogue design is saved with the rest of the document (`.uml.json`, autosave and Google Drive), so you keep editing it there. The exported JSON is the copy for the game.
 
@@ -382,6 +388,8 @@ js/layout.js            Automatic layered layout
 js/templates.js         Palette items: shapes, Unity classes, patterns, flows, dialogue templates
 js/dialogue.js          Game dialogues: node types, condition/action language, checks, JSON export, playtest runner
 js/dialogue-ui.js       Dialogue panels, playtest preview and JSON export dialog
+js/characters-ui.js     Character page (portrait, description, properties)
+js/markdown.js          Small Markdown parser: SVG and HTML rendering, plain-text export
 js/csharp.js            C# code generator and C# parser
 js/mermaid.js           Mermaid import/export, PlantUML export
 js/zip.js               Dependency-free ZIP writer
@@ -405,7 +413,7 @@ There are no dependencies and no build step: plain JavaScript loaded with `<scri
 node tests/run-tests.js
 ```
 
-The tests cover the member parser, translation coverage (every UI string has an English translation), C# import and export (including a round trip that regenerates code from every template and parses it again), Mermaid import and export, edge geometry for every template, auto-layout overlap checks, undo/redo, the ZIP writer, and the dialogue module (condition and action language, checks, JSON export links and the playtest runner).
+The tests cover the member parser, translation coverage (every UI string has an English translation), C# import and export (including a round trip that regenerates code from every template and parses it again), Mermaid import and export, edge geometry for every template, auto-layout overlap checks, undo/redo, the ZIP writer, the dialogue module (condition and action language, checks, JSON export links and the playtest runner), Markdown parsing and stripping, character cards and font scaling.
 
 ---
 

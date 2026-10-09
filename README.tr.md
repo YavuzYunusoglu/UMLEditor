@@ -50,7 +50,7 @@ Tarayıcıda çalışan, ücretsiz ve çevrimdışı kullanılabilen bir **UML s
 |---|---|
 | **Sınıf diyagramları** | Sınıf, soyut sınıf, arayüz, enum, struct, not ve paket/grup. Çokluk etiketleriyle birlikte yedi ilişki türü: association, inheritance, realization, dependency, aggregation, composition ve link. |
 | **Akış şemaları** | Başla/bitir, işlem, karar, girdi/çıktı, döngü (hazırlık), alt süreç, doküman, bağlayıcı ve serbest metin. |
-| **Oyun diyalogları** | Anlatı tasarımcıları için düğüm editörü: replikler, oyuncu seçimleri, koşullar, olaylar/değişkenler ve diyaloglar arası atlama; ortak karakter ve değişken listesi. Sorunlar anında denetlenir, önizleme diyaloğu oyundaki gibi oynatır ve **Diyalog JSON** dışa aktarımıyla birlikte uyumlu Unity C# veri sınıfları gelir. |
+| **Oyun diyalogları** | Anlatı tasarımcıları için düğüm editörü: replikler, oyuncu seçimleri, koşullar, olaylar/değişkenler ve diyaloglar arası atlama; ortak karakter ve değişken listesi. Karakter sayfasında portre, Markdown açıklama ve özellikler tutulur; karakterler tuvale kişi kartı olarak yerleştirilebilir. Sorunlar anında denetlenir, önizleme diyaloğu oyundaki gibi oynatır ve **Diyalog JSON** dışa aktarımıyla birlikte uyumlu Unity C# veri sınıfları gelir. |
 | **Unity kısayolları** | Tek tıkla MonoBehaviour, ScriptableObject, Singleton, `[Serializable]`, Custom Editor, EditorWindow, StateMachineBehaviour ve dahası. Hazır **tasarım desenleri**, **döngü/akış şablonları** ve **Unity mesajları ile alanları** için menüler de var. |
 | **C# dışa aktarma** | Unity'ye hazır `.cs` dosyaları tek bir `.zip` içinde. `[SerializeField]`, `[CreateAssetMenu]`, `[CustomEditor]`, singleton iskeleti ve arayüz metotları otomatik eklenir; editor script'leri `Editor/` klasörüne konur. |
 | **C# içe aktarma** | `.cs` dosyalarını ya da tüm `Assets/Scripts` klasörünü bırakın, sınıf diyagramı oluşsun. Alanlar, özellikler, metotlar, kalıtım ve referanslar otomatik algılanır. |
@@ -59,7 +59,7 @@ Tarayıcıda çalışan, ücretsiz ve çevrimdışı kullanılabilen bir **UML s
 | **Temalar** | Koyu ve açık. |
 | **Google Drive** | Kendi Drive'ınıza isteğe bağlı senkron; cihazlar arası çakışma algılama. |
 | **Her yerde çalışır** | Bilgisayar, tablet ve telefon. Ana ekrana uygulama olarak eklenebilir, internet yokken de açılır. |
-| **Editör kolaylıkları** | Çoklu sekme, geri al/yinele, kopyala/yapıştır, hizalama kılavuzları, ızgaraya yapışma, otomatik yerleşim ve tarayıcıda otomatik kayıt. |
+| **Editör kolaylıkları** | Sekme ya da şekil başına ayarlanabilen yazı boyutu, çoklu sekme, geri al/yinele, kopyala/yapıştır, hizalama kılavuzları, ızgaraya yapışma, otomatik yerleşim ve tarayıcıda otomatik kayıt. |
 
 ---
 
@@ -247,6 +247,10 @@ Diyaloglarla çalışma:
 - **Karakterler ve değişkenler**, hiçbir şey seçili değilken özellikler panelinde listelenir. Karakterler belgedeki tüm diyalog sekmelerinde ortaktır. Değişkenler, koşulların ve eylemlerin kullandığı oyun durumudur (doğru/yanlış, sayı ya da metin) ve her birinin varsayılan değeri vardır.
 - **Hızlı yazma:** bir düğümün kenarındaki noktadan boşluğa sürüklerseniz sıradaki replik oluşur. Uygulama konuşmacıyı, konuşan iki karakter arasında sırayla geçerek tahmin eder. Paneldeki **Ardına ekle** düğmeleri seçili düğümün ardına replik, seçim, koşul, olay ya da bitiş ekler. Düğümün zaten bir sonraki adımı varsa düğme **Araya ekle** olur: yeni düğüm araya girer ve aşağıdaki düğümler yer açmak için kayar.
 - Replik metnine **çift tıklayarak** yazın, başlığına çift tıklayarak konuşmacıyı değiştirin, seçim düğümündeki bir seçenek satırına çift tıklayarak o seçeneği düzenleyin.
+- **Karakter sayfası:** diyalog sekmesindeyken sekme çubuğundaki **Karakterler** düğmesi oyuncu kadrosu için ayrı bir sayfa açar. Her karakterin portresi, rengi, kimliği, rolü/unvanı, Markdown ile yazılan ve canlı önizlemesi olan bir açıklaması ve serbest özellikleri (yaş, amaç, korku, konuşma tarzı… ya da istediğiniz herhangi bir şey) vardır. Sayfa ayrıca karakterin konuştuğu tüm replikleri listeler.
+- **Kişi kartları:** diyalog sekmesinde paletin bir **Karakterler** bölümü vardır. Bir karakteri tuvale sürükleyince (ya da karakter sayfasındaki **Sahneye ekle** ile) portresini, rolünü, açıklamasını ve özelliklerini gösteren bir kişi kartı oluşur. Karakteri düzenleyince kart da güncellenir. Kartın kenarından boşluğa sürüklerseniz o karakterin konuştuğu yeni bir replik başlar.
+- **Markdown:** replikler, seçenekler ve karakter sayfası `**kalın**`, `*italik*`, `` `kod` ``, `~~üstü çizili~~`, `# başlık`, `- liste` ve `> alıntı` biçimlerini destekler. Bunlar tuvalde ve önizlemede biçimli görünür; JSON dışa aktarımında ise Markdown işaretleri olmadan düz metin olarak yer alır.
+- **Yazı boyutu:** hiçbir şey seçili değilken özellikler panelindeki **Yazı boyutu** ayarı tüm sekmeye uygulanır (şekiller, bağlantı etiketleri ve sonradan eklenen şekiller). Seçili şekillerin de kendi **Yazı boyutu** ayarı vardır. Bu ayar sınıf diyagramlarında ve akış şemalarında da çalışır. Şekiller merkezlerinden büyüdüğü için ardından **Yerleşim** çalıştırmak isteyebilirsiniz.
 - **Kontrol:** bağlanmamış seçenekler, eksik konuşmacılar, koşul yazım hataları, tanımsız değişkenler, ulaşılamayan düğümler ve aynı kimliği kullanan başlangıçlar gibi sorunlar düğümün üzerinde bir işaretle gösterilir ve panelde listelenir. Bir soruna tıklayınca o düğüme gidilir.
 - **Oynat:** **Oynat** düğmesi diyaloğu oyundaki gibi çalıştıran bir önizleme açar. Önizleme sırasında değişkenleri değiştirebilir, seçenekleri rakam tuşlarıyla seçebilir, kilitli seçenekleri ve neden kilitli olduklarını görebilir, her mesajdan tuvaldeki düğümüne gidebilirsiniz.
 
@@ -284,6 +288,8 @@ DialogueNode node = d.Find(d.start);
 ```
 
 Oyun bundan sonra düğümleri sırayla izler. `line` düğümünü gösterip `next` değerine geçer. `choice` düğümünde `condition` değeri sağlanan seçenekleri gösterir. `condition` düğümünde ifadeyi değerlendirip `ifTrue` ya da `ifFalse` değerine gider. `action` düğümünün eylemlerini uygular, `jump` düğümünde başka diyaloğa geçer ve `end` düğümünde ya da `next` boş olduğunda durur. Koşullarda `== != < > <= >=`, `and or not` (ya da `&& || !`), sayılar, `"metinler"`, `true` / `false` ve değişken adları kullanılır.
+
+Kişi kartları ve karakter sayfasındaki ayrıntılar (portre, rol, açıklama, özellikler) tasarım notudur ve dışa aktarılmaz; JSON her karakter için yalnızca `id`, `name` ve `color` alanlarını içerir.
 
 Diyalog tasarımı belgenin geri kalanıyla birlikte kaydedilir (`.uml.json`, otomatik kayıt ve Google Drive); düzenlemeye orada devam edersiniz. Dışa aktarılan JSON oyun için hazırlanan kopyadır.
 
@@ -382,6 +388,8 @@ js/layout.js            Otomatik katmanlı yerleşim
 js/templates.js         Palet öğeleri: şekiller, Unity sınıfları, desenler, akışlar, diyalog şablonları
 js/dialogue.js          Oyun diyalogları: düğüm türleri, koşul/eylem dili, kontroller, JSON dışa aktarım, önizleme oynatıcısı
 js/dialogue-ui.js       Diyalog panelleri, önizleme ve JSON dışa aktarım penceresi
+js/characters-ui.js     Karakter sayfası (portre, açıklama, özellikler)
+js/markdown.js          Küçük Markdown ayrıştırıcı: SVG ve HTML çizimi, düz metne çevirme
 js/csharp.js            C# kod üretici ve C# ayrıştırıcı
 js/mermaid.js           Mermaid içe/dışa aktarma, PlantUML dışa aktarma
 js/zip.js               Bağımlılıksız ZIP yazıcı
@@ -405,7 +413,7 @@ Bağımlılık ve derleme adımı yoktur: `<script>` etiketleriyle yüklenen dü
 node tests/run-tests.js
 ```
 
-Testler şunları kapsar: üye ayrıştırıcı, çeviri kapsamı (her arayüz metninin İngilizce karşılığı var mı), C# içe ve dışa aktarma (her şablondan kod üretip tekrar ayrıştıran gidiş-dönüş testi dahil), Mermaid içe ve dışa aktarma, her şablon için çizgi geometrisi, otomatik yerleşimde çakışma kontrolü, geri al/yinele, ZIP yazıcı ve diyalog modülü (koşul ve eylem dili, kontroller, JSON dışa aktarımdaki bağlantılar ve önizleme oynatıcısı).
+Testler şunları kapsar: üye ayrıştırıcı, çeviri kapsamı (her arayüz metninin İngilizce karşılığı var mı), C# içe ve dışa aktarma (her şablondan kod üretip tekrar ayrıştıran gidiş-dönüş testi dahil), Mermaid içe ve dışa aktarma, her şablon için çizgi geometrisi, otomatik yerleşimde çakışma kontrolü, geri al/yinele, ZIP yazıcı, diyalog modülü (koşul ve eylem dili, kontroller, JSON dışa aktarımdaki bağlantılar ve önizleme oynatıcısı), Markdown ayrıştırma ve düz metne çevirme, kişi kartları ve yazı boyutu ölçekleme.
 
 ---
 

@@ -431,5 +431,16 @@
     { group: $t('Özellikler'), items: ['+ {static} Instance : GameManager {get; private set;}', '+ IsGrounded : bool {get; private set;}'] },
   ];
 
-  App.Templates = { items, SECTIONS, UNITY_METHODS, UNITY_FIELDS, byId: (id) => items.find((i) => i.id === id) };
+  /* Karakter sayfasındaki karakterler: palette sürüklenince kişi kartı olur */
+  function charItem(cid) {
+    const c = App.Dialogue.character(App.Store.doc, cid);
+    if (!c) return null;
+    return {
+      section: 'characters', id: 'char:' + cid, label: c.name, alt: (c.role || '') + ' ' + cid, icon: 'char', color: c.color, portrait: c.portrait,
+      build: () => single(Object.assign({ type: 'dlgCard', w: SH.dlgCard.w, h: SH.dlgCard.h }, App.Dialogue.defaults('dlgCard'), { charId: cid })),
+    };
+  }
+  const characterItems = () => App.Dialogue.reg(App.Store.doc).characters.map((c) => charItem(c.id));
+
+  App.Templates = { items, SECTIONS, UNITY_METHODS, UNITY_FIELDS, characterItems, byId: (id) => (String(id).startsWith('char:') ? charItem(String(id).slice(5)) : items.find((i) => i.id === id)) };
 })(typeof window !== 'undefined' ? window : globalThis);

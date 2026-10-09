@@ -402,7 +402,7 @@
     if (!n) return;
     const b = Geo.bounds(n);
     Store.begin();
-    st = { mode: 'resize', id: n.id, handle, start: p, orig: b, moved: false, contentMin: n.type === 'class' ? Geo.classLayout(Object.assign({}, n, { w: 0 })).w : isDlg(n) ? 160 : 0 };
+    st = { mode: 'resize', id: n.id, handle, start: p, orig: b, moved: false, contentMin: (n.type === 'class' ? Geo.classLayout(Object.assign({}, n, { w: 0 })).w : isDlg(n) ? 160 : 0) * Geo.fontScale(n) };
   }
 
   function startConnect(nodeId, side, p) {
@@ -692,14 +692,15 @@
       let field = null;
       if (isDlg(n)) {
         field = App.Dialogue.hitField(n, p);
+        if (field === 'card' && App.CharactersUI) { Store.select([n.id], []); App.CharactersUI.open(n.charId); return; }
         if (field === 'speaker' && App.DialogueUI) {
           Store.select([n.id], []);
           App.DialogueUI.speakerMenu(n, e.clientX, e.clientY);
           return;
         }
       } else if (n.type === 'class') {
-        const Lc = Geo.classLayout(n);
-        const ry = p.y - n.y;
+        const Lc = Geo.classLayout(Geo.unscaled(n));
+        const ry = (p.y - n.y) / Geo.fontScale(n);
         field = !Lc.show || ry < Lc.headerH ? 'name' : (Lc.methY && ry >= Lc.methY ? 'methods' : 'attributes');
       }
       Store.select([n.id], []);
@@ -830,7 +831,7 @@
     el.style.padding = (opts.padY != null ? opts.padY * z : 4) + 'px ' + (opts.padX != null ? opts.padX * z : 6) + 'px';
   }
 
-  function showInline(rect, value, opts, onCommit) {
+  function showInlineRaw(rect, value, opts, onCommit) {
     if (inl) commitInline();
     inl = { onCommit, opts, original: value, rect };
     inlineEl.value = value;
@@ -867,14 +868,20 @@
     const n = Store.node(nodeId);
     if (!n) return;
     renderNow();
-    const b = Geo.bounds(n);
+    if (n.type === 'dlgCard') { if (App.CharactersUI) App.CharactersUI.open(n.charId); return; }
+    // yazı boyutu büyütülmüş düğümde konumlar temel ölçekte hesaplanıp düğümün ölçeğine taşınır
+    const k = Geo.fontScale(n), nv = Geo.unscaled(n);
+    const b = Geo.bounds(nv);
+    const showInline = k === 1 ? showInlineRaw : (rect, value, o, commit) => showInlineRaw(
+      { x: n.x + (rect.x - n.x) * k, y: n.y + (rect.y - n.y) * k, w: rect.w * k, h: rect.h * k }, value,
+      Object.assign({}, o, { fontSize: (o.fontSize || 13) * k, lineH: (o.lineH || 17) * k, padX: (o.padX != null ? o.padX : 6) * k, padY: (o.padY != null ? o.padY : 4) * k, minW: (o.minW || 0) * k }), commit);
     if (isDlg(n)) {
       const sp = App.Dialogue.inlineSpec(n, field);
       if (sp) showInline(sp.rect, sp.value || '', sp.opts, (v) => Store.mutate(() => sp.apply(v)));
       return;
     }
     if (n.type === 'class') {
-      const Lc = Geo.classLayout(n);
+      const Lc = Geo.classLayout(nv);
       field = field || 'name';
       if (field === 'methods' && !Lc.methY) field = 'attributes';
       if (field === 'name') {
@@ -890,7 +897,7 @@
     }
     const isNote = n.type === 'note';
     const pad = n.type === 'decision' ? b.w * 0.18 : 8;
-    showInline({ x: b.x + pad, y: b.y, w: b.w - pad * 2, h: b.h }, n.text || '', { align: isNote ? 'left' : 'center', grow: true, padY: isNote ? 12 : Math.max(4, (b.h - 17 * Math.max(1, Geo.flowTextLines(n).length)) / 2), padX: isNote ? 4 : 2, bold: n.type === 'terminator' || n.type === 'frame' },
+    showInline({ x: b.x + pad, y: b.y, w: b.w - pad * 2, h: b.h }, n.text || '', { align: isNote ? 'left' : 'center', grow: true, padY: isNote ? 12 : Math.max(4, (b.h - 17 * Math.max(1, Geo.flowTextLines(nv).length)) / 2), padX: isNote ? 4 : 2, bold: n.type === 'terminator' || n.type === 'frame' },
       (v) => Store.mutate(() => {
         n.text = v;
         if (n.type !== 'frame' && n.type !== 'connector') n.h = Math.max(n.h, Geo.requiredHeight(n));
@@ -901,8 +908,9 @@
     renderNow();
     const e = Store.edge(edgeId), g = geom.get(edgeId);
     if (!e || !g) return;
-    const w = 160, h = 28;
-    showInline({ x: g.labelPos.x - w / 2, y: g.labelPos.y - h / 2, w, h }, e.label || '', { fontSize: 12, lineH: 15, grow: true, padY: 5 },
+    const k = (+Store.tab.fontSize || 13) / 13;
+    const w = 160 * k, h = 28 * k;
+    showInlineRaw({ x: g.labelPos.x - w / 2, y: g.labelPos.y - h / 2, w, h }, e.label || '', { fontSize: 12 * k, lineH: 15 * k, grow: true, padY: 5 * k },
       (v) => Store.mutate(() => { e.label = v.trim(); }));
   }
 
@@ -1103,7 +1111,7 @@
     inlineEl.addEventListener('blur', () => { setTimeout(() => { if (inl && document.activeElement !== inlineEl) commitInline(); }, 0); });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === ' ' && !isTyping(e.target) && !App.UI.topModal()) { if (!spaceDown) { spaceDown = true; wrap.classList.add('space'); } e.preventDefault(); }
+      if (e.key === ' ' && !isTyping(e.target) && !App.UI.topModal() && !(App.CharactersUI && App.CharactersUI.isOpen)) { if (!spaceDown) { spaceDown = true; wrap.classList.add('space'); } e.preventDefault(); }
       if (e.key === 'Alt') wrap.classList.add('alt');
     });
     window.addEventListener('keyup', (e) => {

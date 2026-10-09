@@ -25,6 +25,7 @@
       case 'dlgEnd': return typeLabel(n) + (n.text ? ': ' + n.text : '');
       case 'dlgChoice': return typeLabel(n) + (n.text ? ': ' + cut(n.text, 30) : '');
       case 'dlgAction': return typeLabel(n) + ': ' + cut(n.actions.split('\n')[0], 30);
+      case 'dlgCard': { const c = D.character(Store.doc, n.charId); return typeLabel(n) + ': ' + (c ? c.name : n.charId || '?'); }
     }
     return n.text ? cut(n.text, 36) : typeLabel(n);
   }
@@ -255,6 +256,7 @@
           : null;
         out.push(section(title,
           field($t('Konuşmacı'), speakerChips(n)), warn,
+          h('button', { class: 'link-btn dl-chars-link', html: icon('users', 13) + `<span>${U.esc($t('Karakter sayfası'))}</span>`, onclick: () => App.CharactersUI.open(n.speaker) }),
           field($t('Replik'), textArea(n.text, (v) => { n.text = v; }, { rows: Math.min(10, Math.max(3, Math.ceil((n.text || '').length / 34) + 1)), wrap: true, spellcheck: true, placeholder: $t('Karakterin söyleyeceği') }),
             $t('{degisken} yazarak değişkenin değerini metne ekleyebilirsiniz.')),
           h('datalist', { id: 'emotion-list' }, ['neutral', 'happy', 'sad', 'angry', 'surprised', 'afraid', 'worried', 'thinking', 'whisper'].map((v) => h('option', { value: v }))),
@@ -335,6 +337,20 @@
           t ? h('div', { class: 'p-row wrap' }, btn($t('Hedefe git'), () => locate(t.tab.id, t.node.id), { icon: 'fit' })) : null));
         break;
       }
+      case 'dlgCard': {
+        const opts = [{ value: '', label: $t('(karakter seçin)') }].concat(D.reg(Store.doc).characters.map((c) => ({ value: c.id, label: c.name })));
+        if (n.charId && !D.character(Store.doc, n.charId)) opts.push({ value: n.charId, label: n.charId + ' ?' });
+        out.push(section(title,
+          field($t('Karakter'), select(opts, n.charId || '', (v) => { n.charId = v; })),
+          h('div', { class: 'p-row wrap' },
+            checkbox($t('Açıklamayı göster'), n.showDesc !== false, (v) => { n.showDesc = v; }),
+            checkbox($t('Özellikleri göster'), n.showProps !== false, (v) => { n.showProps = v; })),
+          h('div', { class: 'p-row wrap' }, btn($t('Karakteri düzenle'), () => App.CharactersUI.open(n.charId), { icon: 'users', primary: true })),
+          h('div', { class: 'p-hint' }, $t('Kart, karakter sayfasındaki bilgileri gösterir; oyun JSON\'una girmez. Karttan boşluğa sürüklerseniz bu karakterin konuştuğu yeni bir replik oluşur.')),
+          K.fontField([n])));
+        out.push(nodeActions());
+        return out;
+      }
       case 'dlgEnd':
         out.push(section(title,
           field($t('Sonuç (isteğe bağlı)'), textInput(n.text, (v) => { n.text = v.replace(/\s+/g, '_'); }, { mono: true, placeholder: 'quest_accepted' }),
@@ -343,6 +359,7 @@
     }
     const issues = D.validate(Store.doc, Store.tab.id).filter((i) => i.node === n.id);
     if (issues.length) out.push(section($t('Sorunlar'), h('div', { class: 'dl-issues' }, issues.map((i) => issueRow(i, false)))));
+    out.push(section(null, K.fontField([n])));
     out.push(section(null, playRow(n)));
     out.push(nodeActions());
     if (focusOpt) {
@@ -447,6 +464,7 @@
     const cnt = (t) => tab.nodes.filter((n) => n.type === t).length;
     out.push(section($t('Diyalog sekmesi'),
       field($t('Ad'), textInput(tab.name, (v) => { tab.name = v; Store.emit('tabsChanged'); })),
+      K.tabFontField(tab),
       h('div', { class: 'p-stats' }, stat(cnt('dlgStart'), $t('diyalog')), stat(cnt('dlgLine'), $t('replik')), stat(cnt('dlgChoice'), $t('seçim'))),
       h('div', { class: 'p-row wrap' },
         btn($t('Oynat'), () => playtest(), { icon: 'play', primary: true }),
@@ -454,12 +472,15 @@
 
     out.push(section($t('Karakterler'),
       h('div', { class: 'dl-list' }, R.characters.length ? R.characters.map(charRow) : h('div', { class: 'p-hint' }, $t('Henüz karakter yok.'))),
-      h('div', { class: 'p-row wrap' }, btn($t('Karakter ekle'), async () => {
-        const name = await promptCharacter();
-        if (!name) return;
-        Store.mutate(() => { D.addCharacter(doc, name); });
-        refresh();
-      }, { icon: 'plus' }))));
+      h('div', { class: 'p-row wrap' },
+        btn($t('Karakter sayfası'), () => App.CharactersUI.open(), { icon: 'users', primary: true }),
+        btn($t('Karakter ekle'), async () => {
+          const name = await promptCharacter();
+          if (!name) return;
+          Store.mutate(() => { D.addCharacter(doc, name); });
+          refresh();
+        }, { icon: 'plus' })),
+      h('div', { class: 'p-hint' }, $t('Portre, açıklama ve özellikleri karakter sayfasında düzenleyin; soldaki paletten karakteri sahneye sürükleyin.'))));
 
     out.push(section($t('Değişkenler'),
       h('div', { class: 'dl-list' }, R.variables.length ? R.variables.map(varRow) : h('div', { class: 'p-hint' }, $t('Koşullarda ve eylemlerde kullanılan oyun durumu (altın, görev aşaması, bayraklar).'))),
@@ -522,9 +543,9 @@
       const n = st.node, c = D.character(doc, n.speaker);
       const col = c ? c.color : '#8e9bb0';
       return h('div', { class: 'pl-line', style: { '--who': col } },
-        h('div', { class: 'pl-who' }, h('span', { class: 'pl-ava' }, ((c ? c.name : n.speaker || '?').trim()[0] || '?').toUpperCase()),
+        h('div', { class: 'pl-who' }, h('span', { class: 'pl-ava' }, c && c.portrait ? h('img', { src: c.portrait, alt: '' }) : ((c ? c.name : n.speaker || '?').trim()[0] || '?').toUpperCase()),
           h('b', null, c ? c.name : n.speaker || $t('(konuşmacı yok)')), n.emotion ? h('em', null, n.emotion) : null, locBtn(st)),
-        h('div', { class: 'pl-text' }, st.text || '\u2026'),
+        h('div', { class: 'pl-text md', html: st.text ? App.Md.toHtml(st.text) : '\u2026' }),
         n.audio ? h('div', { class: 'pl-meta' }, '\u266A ' + n.audio) : null);
     }
 
@@ -545,13 +566,13 @@
         ctrl.append(cont);
         m.onEnter = () => go(st.next);
       } else if (st.kind === 'choice') {
-        if (!again && st.prompt) add(h('div', { class: 'pl-prompt' }, st.prompt));
+        if (!again && st.prompt) add(h('div', { class: 'pl-prompt md', html: App.Md.toHtml(st.prompt) }));
         const list = h('div', { class: 'pl-opts' });
         let k = 0;
         for (const o of st.options) {
           if (!o.available && !showLocked) continue;
           const b = h('button', { class: 'pl-opt' + (o.available ? '' : ' locked'), disabled: !o.available },
-            h('span', { class: 'pl-n' }, String(o.index + 1)), h('span', { class: 'pl-otext' }, o.text || $t('(boş seçenek)')),
+            h('span', { class: 'pl-n' }, String(o.index + 1)), h('span', { class: 'pl-otext md', html: o.text ? App.Md.toHtml(o.text, true) : U.esc($t('(boş seçenek)')) }),
             o.available ? null : h('span', { class: 'pl-why' }, o.reason));
           if (o.available) {
             k++;
@@ -574,7 +595,7 @@
     }
     function pick(o) {
       if (!stop || stop.kind !== 'choice') return;
-      add(h('div', { class: 'pl-me' }, h('span', null, o.text || '\u2026')));
+      add(h('div', { class: 'pl-me md', html: o.text ? App.Md.toHtml(o.text, true) : '\u2026' }));
       go(runner.choose(o));
     }
     function renderVars() {

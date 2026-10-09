@@ -70,10 +70,12 @@
       const ids = new Set(t.nodes.map((n) => n.id));
       t.edges = (t.edges || []).filter((e) => e && e.id && ids.has(e.from) && ids.has(e.to));
       t.routing = t.routing || 'orthogonal';
+      if (!(+t.fontSize >= 6 && +t.fontSize <= 96)) delete t.fontSize; else t.fontSize = +t.fontSize;
       if (t.kind !== 'dialogue') delete t.kind;
       if (!t.view || !isFinite(t.view.zoom)) t.view = { x: 80, y: 60, zoom: 1 };
       for (const n of t.nodes) {
         n.x = +n.x || 0; n.y = +n.y || 0;
+        if (n.fs != null) { if (+n.fs >= 6 && +n.fs <= 96) n.fs = +n.fs; else delete n.fs; }
         if (n.type === 'class') {
           n.name = n.name == null ? 'Sinif' : String(n.name);
           n.attributes = n.attributes || ''; n.methods = n.methods || '';
@@ -127,6 +129,11 @@
       if (this._depth > 0) return false;
       const before = this._tx;
       this._tx = null;
+      // sekmenin yazı boyutu yeni eklenen şekillere de uygulanır
+      const t = this.tab;
+      if (t && t.fontSize) {
+        for (const n of t.nodes) if (n.fs == null) { if (App.Geo) App.Geo.setFontSize(n, t.fontSize, true); else n.fs = t.fontSize; }
+      }
       if (before !== this.serialize()) {
         this.undoStack.push(before);
         if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();

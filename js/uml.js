@@ -25,6 +25,7 @@
     dlgAction:   { label: $t('Olay / Değişken'), w: 220, h: 60, color: '#b26bff', dlg: true },
     dlgJump:     { label: $t('Diyaloğa Atla'), w: 200, h: 46, color: '#2bc0d6', dlg: true },
     dlgEnd:      { label: $t('Bitiş'), w: 170, h: 38, color: '#ff6b6b', dlg: true },
+    dlgCard:     { label: $t('Kişi Kartı'), w: 290, h: 120, color: '#8e9bb0', dlg: true },
   };
   const FLOW_TYPES = ['terminator', 'process', 'decision', 'io', 'preparation', 'subprocess', 'document', 'connector'];
 

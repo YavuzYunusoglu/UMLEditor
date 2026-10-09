@@ -457,6 +457,7 @@
     $('btnTheme').addEventListener('click', Actions.toggleTheme);
     $('btnHelp').addEventListener('click', Actions.showShortcuts);
     $('btnCmd').addEventListener('click', () => openCommandPalette());
+    $('btnChars').addEventListener('click', () => App.CharactersUI.open());
     $('docName').addEventListener('change', (e) => { Store.mutate(() => { Store.doc.name = e.target.value.trim() || $t('Adsız'); }); updateTitle(); });
     $('docName').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     $('zoomIn').addEventListener('click', () => Editor.zoomAt(1.2));
@@ -565,10 +566,33 @@
         }
         body.append(h('div', { class: 'pal-section' }, head, isCol ? null : grid));
       }
+      if (App.Dialogue.isDialogueTab(Store.tab)) body.appendChild(characterSection(q));
       if (!body.children.length) body.appendChild(h('div', { class: 'p-hint pad' }, $t('Sonuç yok')));
     };
     search.addEventListener('input', render);
     render();
+  }
+
+  /* Diyalog sekmesinde: karakter sayfasındaki karakterler, tuvale kişi kartı olarak sürüklenir */
+  function characterSection(q) {
+    const all = App.Templates.characterItems();
+    const items = all.filter((it) => !q || q.split(/\s+/).every((w) => norm(it.label + ' ' + it.alt + ' ' + $t('Karakterler')).includes(w)));
+    if (q && !items.length) return h('div');
+    const isCol = !q && collapsed.characters;
+    const head = h('button', { class: 'pal-head' + (isCol ? ' collapsed' : ''), html: icon('chevron', 14) + `<span>${U.esc($t('Karakterler'))}</span><em>${all.length}</em>` });
+    head.addEventListener('click', () => { collapsed.characters = !collapsed.characters; try { localStorage.setItem('umlstudio.palette', JSON.stringify(collapsed)); } catch (e) { /* yok say */ } renderPalette(); });
+    if (isCol) return h('div', { class: 'pal-section' }, head);
+    const grid = h('div', { class: 'pal-grid list' });
+    for (const it of items) {
+      const el = h('div', { class: 'pal-item', draggable: 'true', title: $t('{label}: kişi kartı olarak sahneye sürükleyin', { label: it.label }), tabindex: 0 },
+        h('span', { class: 'pal-ico', html: UI.paletteIcon(it) }), h('span', { class: 'pal-label' }, it.label));
+      el.addEventListener('click', () => { if (isCompact()) closePanes(); Editor.insertItem(it); });
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') Editor.insertItem(it); });
+      el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-umlstudio', it.id); e.dataTransfer.effectAllowed = 'copy'; });
+      grid.appendChild(el);
+    }
+    const open = h('button', { class: 'link-btn pal-link', html: icon('users', 13) + `<span>${U.esc(all.length ? $t('Karakter sayfası') : $t('Karakter oluştur'))}</span>`, onclick: () => App.CharactersUI.open() });
+    return h('div', { class: 'pal-section' }, head, grid, open);
   }
 
   function norm(s) {
@@ -641,6 +665,7 @@
     items.push(
       act($t('Yeni sekme'), 'plus', () => Actions.addTab()),
       act($t('Yeni diyalog sekmesi'), 'chat', () => Actions.addDialogueTab()),
+      act($t('Karakter sayfası'), 'users', () => App.CharactersUI.open()),
       act($t('PNG olarak dışa aktar'), 'image', () => Actions.exportImageDialog('png')),
       act($t('SVG olarak dışa aktar'), 'image', () => Actions.exportImageDialog('svg')),
       act($t('C# script\'leri dışa aktar (.zip)'), 'code', () => IO.exportCSharpZip()),
@@ -719,9 +744,11 @@
         }
       }
       if (sel.length === 1 && App.Dialogue.isDlg(n)) {
-        items.push({ sep: true }, { label: $t('Buradan oynat'), icon: 'play', action: () => App.DialogueUI.playtest(n.id) });
+        items.push({ sep: true });
+        if (n.type !== 'dlgCard') items.push({ label: $t('Buradan oynat'), icon: 'play', action: () => App.DialogueUI.playtest(n.id) });
         if (n.type === 'dlgLine') items.push({ label: $t('Konuşmacı'), submenu: App.Dialogue.reg(Store.doc).characters.map((c) => ({ label: c.name, checked: n.speaker === c.id, action: () => Store.mutate(() => { n.speaker = c.id; }) })).concat([{ label: $t('(konuşmacı yok)'), checked: !n.speaker, action: () => Store.mutate(() => { n.speaker = ''; }) }]) });
         if (n.type === 'dlgChoice') items.push({ label: $t('Seçenek ekle'), icon: 'plus', action: () => App.DialogueUI.addOption(n) });
+        if (n.type === 'dlgCard') items.push({ label: $t('Karakteri düzenle'), icon: 'users', action: () => App.CharactersUI.open(n.charId) });
       }
       if (sel.length === 1 && App.UML.FLOW_TYPES.includes(n.type)) {
         items.push({ sep: true }, { label: $t('Şekli değiştir'), submenu: App.UML.FLOW_TYPES.map((t) => ({ label: App.UML.SHAPES[t].label, checked: n.type === t, action: () => Store.mutate(() => { n.type = t; if (t === 'connector') n.w = n.h = 40; }) })) });
@@ -774,6 +801,13 @@
     }
     if (mod && k === 'o') { e.preventDefault(); Actions.open(); return; }
     if (mod && k === 'k') { e.preventDefault(); openCommandPalette(); return; }
+    if (App.CharactersUI.isOpen) {
+      if (k === 'Escape' && !UI.closeMenus()) { e.preventDefault(); App.CharactersUI.close(); return; }
+      if (Editor.isTyping(e.target)) return;
+      if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); Store.undo(); }
+      else if ((mod && k === 'y') || (mod && e.shiftKey && k === 'z')) { e.preventDefault(); Store.redo(); }
+      return;
+    }
     if (Editor.isTyping(e.target) || Editor.editing) return;
     if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); Store.undo(); return; }
     if ((mod && k === 'y') || (mod && e.shiftKey && k === 'z')) { e.preventDefault(); Store.redo(); return; }
@@ -909,7 +943,12 @@ public class Enemy : MonoBehaviour, IDamageable {
     Store.on('tabsChanged', renderTabs);
     // sekme türü değişince palet bölümleri değişir
     let palKind = null;
-    const syncPalette = () => { const k = App.Dialogue.isDialogueTab(Store.tab); if (k !== palKind) { palKind = k; renderPalette(); } };
+    const syncPalette = () => {
+      const isD = App.Dialogue.isDialogueTab(Store.tab);
+      const k = isD + '|' + (isD ? App.Dialogue.reg(Store.doc).characters.map((c) => [c.id, c.name, c.color, c.role || '', (c.portrait || '').length].join(':')).join(',') : '');
+      if (k !== palKind) { palKind = k; renderPalette(); }
+      document.getElementById('btnChars').hidden = !isD;
+    };
     Store.on('tab', syncPalette);
     Store.on('load', syncPalette);
     Store.on('change', syncPalette);

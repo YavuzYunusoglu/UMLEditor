@@ -29,6 +29,8 @@
     image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/>',
     chevron: '<path d="m6 9 6 6 6-6"/>',
     chevronRight: '<path d="m9 6 6 6-6 6"/>',
+    chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
     zoomIn: '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5M11 8v6M8 11h6"/>',
     zoomOut: '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5M8 11h6"/>',
     routeOrth: '<path d="M4 19h7V5h9"/>',
@@ -96,6 +98,14 @@
       case 'dlgAction': inner = `<rect x="4" y="6" width="24" height="20" rx="3" ${st}/><path d="M17.5 9 12 17h4l-1.5 6 5.5-8h-4z" fill="${col}"/>`; break;
       case 'dlgJump': inner = `<rect x="3" y="9" width="26" height="14" rx="7" ${st}/><path d="M10 19v-2.5a2.5 2.5 0 0 1 2.5-2.5H21M18.5 11.5 21 14l-2.5 2.5" stroke="${col}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; break;
       case 'dlgEnd': inner = `<rect x="3" y="9" width="26" height="14" rx="7" ${st}/><rect x="12.5" y="13" width="7" height="6" rx="1.2" fill="${col}"/>`; break;
+      case 'char': {
+        const letter = U.esc((String(item.label || '').trim()[0] || '?').toUpperCase());
+        const cid = 'pal-' + String(item.id).replace(/[^\w-]/g, '_');
+        inner = item.portrait
+          ? `<defs><clipPath id="${cid}"><circle cx="16" cy="16" r="13"/></clipPath></defs><circle cx="16" cy="16" r="13" fill="${item.color}"/><image href="${U.esc(item.portrait)}" x="3" y="3" width="26" height="26" preserveAspectRatio="xMidYMid slice" clip-path="url(#${cid})"/>`
+          : `<circle cx="16" cy="16" r="13" fill="${item.color}"/><text x="16" y="21" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">${letter}</text>`;
+        break;
+      }
       case 'dlgPattern': inner = `<path d="M3 4h17v10h-9l-4 3.5V14H3z" stroke="#f5a623" fill="${U.rgba('#f5a623', 0.2)}" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 17h17v10h-4v3.5L21 27h-9z" stroke="#4f8cff" fill="${U.rgba('#4f8cff', 0.2)}" stroke-width="1.4" stroke-linejoin="round"/>`; break;
       default: inner = `<rect x="4" y="8" width="24" height="16" rx="2" ${st}/>`;
     }
@@ -104,7 +114,7 @@
 
   /* ---------- Menüler ---------- */
   let openMenus = [];
-  function closeMenus() { openMenus.forEach((m) => m.remove()); openMenus = []; document.querySelectorAll('.tb-btn.open').forEach((b) => b.classList.remove('open')); }
+  function closeMenus() { const had = openMenus.length > 0; openMenus.forEach((m) => m.remove()); openMenus = []; document.querySelectorAll('.tb-btn.open').forEach((b) => b.classList.remove('open')); return had; }
   function closeDeeper(level) {
     openMenus.filter((m) => +m.dataset.level > (level || 0)).forEach((m) => m.remove());
     openMenus = openMenus.filter((m) => m.isConnected);

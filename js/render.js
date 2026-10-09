@@ -119,6 +119,11 @@
   }
 
   function renderNode(n, T, live, dctx) {
+    const k = Geo.fontScale(n);
+    if (k !== 1) {
+      // yazı boyutu: temel ölçekte çiz, düğümün sol üst köşesine göre büyüt
+      return `<g transform="matrix(${f(k * 1000) / 1000},0,0,${f(k * 1000) / 1000},${f(n.x - k * n.x)},${f(n.y - k * n.y)})">` + renderNode(Geo.unscaled(n), T, live, dctx) + '</g>';
+    }
     if (n.type === 'class') return renderClass(n, T);
     if (App.Dialogue && App.Dialogue.isDlg(n)) return App.Dialogue.render(n, T, live, dctx);
     if (n.type === 'frame') return renderFrame(n, T, live);
@@ -154,21 +159,23 @@
     return s + '</g>';
   }
 
-  function labelBox(x, y, str, T, color, edgeId) {
+  function labelBox(x, y, str, T, color, edgeId, k) {
+    k = k || 1;
     const lines = String(str).split('\n');
-    const fnt = U.font(12);
-    const w = Math.max(...lines.map((l) => U.measure(l, fnt))) + 10;
-    const h = lines.length * 15 + 5;
+    const fnt = U.font(12 * k);
+    const w = Math.max(...lines.map((l) => U.measure(l, fnt))) + 10 * k;
+    const h = (lines.length * 15 + 5) * k;
     let s = `<g${edgeId ? ` data-edge="${edgeId}" class="edge-label"` : ''}>`;
-    s += `<rect x="${f(x - w / 2)}" y="${f(y - h / 2)}" width="${f(w)}" height="${f(h)}" rx="4" fill="${T.labelBg}" fill-opacity="0.92"/>`;
-    lines.forEach((l, i) => { s += text(x, y - h / 2 + 2.5 + i * 15 + 11.5, l, { size: 12, fill: color, anchor: 'middle' }); });
+    s += `<rect x="${f(x - w / 2)}" y="${f(y - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(4 * k)}" fill="${T.labelBg}" fill-opacity="0.92"/>`;
+    lines.forEach((l, i) => { s += text(x, y - h / 2 + (2.5 + i * 15 + 11.5) * k, l, { size: f(12 * k), fill: color, anchor: 'middle' }); });
     return s + '</g>';
   }
 
-  function renderEdgeLabels(e, g, T, selected) {
+  function renderEdgeLabels(e, g, T, selected, k) {
+    k = k || 1;
     const color = selected ? T.accent : T.text;
     let s = '';
-    if (e.label) s += labelBox(g.labelPos.x, g.labelPos.y, e.label, T, color, e.id);
+    if (e.label) s += labelBox(g.labelPos.x, g.labelPos.y, e.label, T, color, e.id, k);
     const endLbl = (str, pt, u) => {
       // uç noktaya yakın, çizginin yanına
       let p = { x: -u.y, y: u.x };
@@ -176,7 +183,7 @@
       if (horiz ? p.y > 0 : p.x < 0) p = { x: -p.x, y: -p.y }; // yatayda üstte, dikeyde sağda
       const x = pt.x + u.x * 18 + p.x * (horiz ? 10 : 6);
       const y = pt.y + u.y * 18 + p.y * 10;
-      return text(x, y + 4, str, { size: 12, fill: T.textDim, anchor: horiz ? 'middle' : 'start' });
+      return text(x, y + 4 * k, str, { size: f(12 * k), fill: T.textDim, anchor: horiz ? 'middle' : 'start' });
     };
     if (e.srcLabel) s += endLbl(e.srcLabel, g.start, g.startDir);
     if (e.dstLabel) s += endLbl(e.dstLabel, g.end, { x: -g.endDir.x, y: -g.endDir.y });
@@ -207,7 +214,7 @@
       const dd = dctx && D.edgeDecor(e, nodeMap.get(e.from));
       if (dd) e = Object.assign({}, e, { label: dd.label, color: e.color || dd.color });
       edges += renderEdge(e, g, T, sel, live);
-      labels += renderEdgeLabels(e, g, T, sel);
+      labels += renderEdgeLabels(e, g, T, sel, (+tab.fontSize || 13) / 13);
     }
     return { frames, nodes, edges, labels, geom };
   }

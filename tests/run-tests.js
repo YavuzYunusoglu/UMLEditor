@@ -10,7 +10,7 @@ const ctx = { console, globalThis: null, TextEncoder };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
 // Testler varsayılan dil (İngilizce) ile çalışır: vm bağlamında navigator yok
-for (const f of ['i18n.js', 'util.js', 'theme.js', 'uml.js', 'model.js', 'geometry.js', 'dialogue.js', 'render.js', 'layout.js', 'templates.js', 'csharp.js', 'mermaid.js', 'zip.js']) {
+for (const f of ['i18n.js', 'util.js', 'markdown.js', 'theme.js', 'uml.js', 'model.js', 'geometry.js', 'dialogue.js', 'render.js', 'layout.js', 'templates.js', 'csharp.js', 'mermaid.js', 'zip.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
 const App = ctx.App;
@@ -494,6 +494,91 @@ test('Diyalog: kimlik üretimi ve C# modeli', () => {
   const cs = DL.csharpModel();
   for (const k of ['class DialogueDatabase', 'class DialogueNode', 'public string ifTrue', 'public DialogueOption[] options', 'public string defaultValue']) assert.ok(cs.includes(k), k);
   assert.ok(!/[^\x00-\x7F]/.test(cs), 'C# dosyası ASCII');
+});
+
+/* ---------- Markdown, kişi kartı, yazı boyutu ---------- */
+test('Markdown: satır içi biçimler ve düz metin', () => {
+  const r = plain(App.Md.parseInline('a **kalın** *ital* `kod` ~~x~~ snake_case_var'));
+  assert.deepStrictEqual(r.map((x) => x.t), ['a ', 'kalın', ' ', 'ital', ' ', 'kod', ' ', 'x', ' snake_case_var']);
+  assert.ok(r[1].b && r[3].i && r[5].c && r[7].s);
+  assert.strictEqual(App.Md.strip('# Başlık\n**Dur!** *fısıldar*\n- bir\n2. iki\n> söz'), 'Başlık\nDur! fısıldar\n- bir\n2. iki\nsöz');
+  assert.strictEqual(App.Md.strip('5 * 3 = 15 ve 2*x'), '5 * 3 = 15 ve 2*x');
+  assert.strictEqual(App.Md.strip('\\*yıldız\\*'), '*yıldız*');
+  const html = App.Md.toHtml('**a** <b>');
+  assert.ok(html.includes('<strong>a</strong>') && html.includes('&lt;b&gt;'), html);
+  const L = App.Md.layout('# Başlık\nuzun bir **satır** metni burada kaydırılır', { size: 13, lh: 17, width: 80 });
+  assert.ok(L.lines.length >= 3 && L.h > 0);
+  assert.ok(!/NaN|undefined/.test(App.Md.render(L, 0, 0, { fill: '#fff', dim: '#999' })));
+});
+test('Diyalog: Markdown JSON\'a düz metin gider, kişi kartı ve karakter ayrıntıları gitmez', () => {
+  const doc = dialogueDoc('dlgShop');
+  const tab = doc.tabs[0];
+  const line = tab.nodes.find((n) => n.type === 'dlgLine');
+  line.text = 'Bu **çelik** kılıç *çok* keskin.';
+  const ch = DL.reg(doc).characters[0];
+  Object.assign(ch, { role: 'Tüccar', desc: '# Geçmiş\nEski **asker**', props: [{ key: 'Yaş', value: '*52*' }] });
+  const card = App.Model.createNode('dlgCard', 900, 0, { charId: ch.id });
+  tab.nodes.push(card);
+  tab.edges.push(App.Model.createEdge(card.id, line.id, 'flow'));
+  const issues = DL.validate(doc);
+  assert.ok(!issues.some((i) => i.node === card.id), 'kart kontrol edilmez');
+  assert.deepStrictEqual(plain(issues.filter((i) => i.level === 'error')), []);
+  const data = DL.exportData(doc);
+  const nodes = data.dialogues[0].nodes;
+  assert.ok(!nodes.some((n) => n.id === card.id || !n.type));
+  assert.strictEqual(nodes.find((n) => n.id === line.id).text, 'Bu çelik kılıç çok keskin.');
+  assert.deepStrictEqual(Object.keys(data.characters[0]).sort(), ['color', 'id', 'name']);
+  // kart çizilir ve yüksekliği içeriğe göre büyür
+  const bare = App.Geo.nodeSize(Object.assign({}, card, { charId: '' })).h;
+  assert.ok(App.Geo.nodeSize(card).h > bare);
+  const out = App.Render.renderTab(tab, App.Theme.themes.dark, { live: true });
+  assert.ok(!/NaN|undefined/.test(out.nodes), 'kart çizimi');
+  // karttan çıkan replik o karakterle konuşur
+  assert.strictEqual(DL.guessSpeaker(tab, card), ch.id);
+  // kimlik değişince kart da izler
+  DL.renameCharacter(doc, ch, 'trader');
+  assert.strictEqual(card.charId, 'trader');
+});
+test('Yazı boyutu: şekiller büyür, genişlik sabit kalan düğümler uzar', () => {
+  const p = App.Model.createNode('process', 0, 0, { text: 'Kısa' });
+  const s13 = App.Geo.nodeSize(p);
+  p.fs = 26;
+  App.Geo.fitText(p);
+  assert.strictEqual(App.Geo.nodeSize(p).w, s13.w);
+  assert.ok(p.h >= s13.h);
+  const cls = App.Model.createNode('class', 0, 0, { name: 'Player', attributes: '- speed : float' });
+  const c13 = App.Geo.nodeSize(cls);
+  cls.fs = 26;
+  const c26 = App.Geo.nodeSize(cls);
+  assert.ok(Math.abs(c26.w - c13.w * 2) < 1 && Math.abs(c26.h - c13.h * 2) < 1, JSON.stringify([c13, c26]));
+  const ln = App.Model.createNode('dlgLine', 0, 0, { text: 'Uzun bir replik metni buraya yazıldı ve satırlara bölünür.' });
+  const l13 = App.Geo.nodeSize(ln);
+  ln.fs = 20;
+  const l20 = App.Geo.nodeSize(ln);
+  assert.strictEqual(l20.w, l13.w);
+  assert.ok(l20.h > l13.h);
+  const tab = App.Model.newTab('t');
+  tab.nodes.push(p, cls, ln);
+  const out = App.Render.renderTab(tab, App.Theme.themes.dark, {});
+  assert.strictEqual((out.nodes.match(/transform="matrix\(2,0,0,2/g) || []).length, 2);
+  // normalize geçersiz boyutları atar
+  const d = App.Model.normalize({ tabs: [{ fontSize: 'x', nodes: [{ id: 'a', type: 'process', fs: 500 }, { id: 'b', type: 'note', fs: '18' }], edges: [] }] });
+  assert.strictEqual(d.tabs[0].fontSize, undefined);
+  assert.strictEqual(d.tabs[0].nodes[0].fs, undefined);
+  assert.strictEqual(d.tabs[0].nodes[1].fs, 18);
+});
+test('Yazı boyutu: sekmeye yeni eklenen şekil sekme boyutunu alır', () => {
+  const S = App.Store;
+  S.load(App.Model.newDoc());
+  S.mutate(() => { S.tab.fontSize = 18; });
+  S.mutate(() => { S.tab.nodes.push(App.Model.createNode('process', 0, 0)); });
+  assert.strictEqual(S.tab.nodes[0].fs, 18);
+});
+test('Karakter kaydı: ayrıntılar temizlenir, geçersiz portre atılır', () => {
+  const c = DL.cleanCharacter({ id: 'a', name: 'A', role: 'R', desc: 'D', props: [{ key: 'k', value: 1 }, null], portrait: 'javascript:alert(1)' }, 0);
+  assert.deepStrictEqual(plain(c.props), [{ key: 'k', value: '1' }]);
+  assert.strictEqual(c.portrait, undefined);
+  assert.ok(DL.cleanCharacter({ id: 'b', portrait: 'data:image/jpeg;base64,AAAA' }).portrait);
 });
 
 /* ---------- Çeviri (i18n) ---------- */
