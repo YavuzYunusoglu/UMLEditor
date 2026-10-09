@@ -90,6 +90,8 @@
       }
       for (const e of t.edges) if (!EDGE_TYPES[e.type]) e.type = 'association';
       if (App.Dialogue.isDialogueTab(t)) { t.kind = 'dialogue'; App.Dialogue.sync(t); }
+      // karakter sayfası: yalnızca diyalog sekmelerinde
+      if (t.kind !== 'dialogue' || typeof t.owner !== 'string' || !t.owner) delete t.owner;
     }
     App.Dialogue.normalizeReg(doc);
     if (!doc.tabs.some((t) => t.id === doc.activeTab)) doc.activeTab = doc.tabs[0].id;

@@ -121,8 +121,52 @@
       if (n.type === 'dlgLine' && n.speaker === c.id) n.speaker = newId;
       if (n.type === 'dlgCard' && n.charId === c.id) n.charId = newId;
     }
+    for (const t of doc.tabs) if (t.owner === c.id) t.owner = newId;
     c.id = newId;
     return true;
+  }
+  /* Karakteri sil; onun sayfası olan sekmeler sahipsiz kalır (replikler konuşmacısız kalır) */
+  function removeCharacter(doc, c) {
+    const r = ensureReg(doc);
+    r.characters = r.characters.filter((x) => x !== c);
+    for (const t of doc.tabs) if (t.owner === c.id) delete t.owner;
+  }
+
+  /* ---------------- Karakter sayfaları ----------------
+     Bir diyalog sekmesi bir karaktere ait olabilir (tab.owner = karakter kimliği): o karakterin konuşmaları
+     ayrı sayfada yazılır ve ayrı JSON olarak dışa aktarılabilir. */
+  function tabOwner(doc, tab) { return tab && tab.owner ? character(doc, tab.owner) : null; }
+  function pagesOf(doc, charId) { return doc.tabs.filter((t) => isDialogueTab(t) && t.owner === charId); }
+  /* Yeni karakter sayfası için başlangıç parçası: Başlangıç -> karakterin repliği -> Bitiş */
+  function pageStarter(c) {
+    const SH = App.UML.SHAPES;
+    const node = (id, type, props) => Object.assign({ id, type, x: 0, y: 0, w: SH[type].w, h: SH[type].h }, defaults(type), props);
+    return {
+      nodes: [node('s', 'dlgStart', { text: c.name, dlgId: slug(c.name, c.id) + '_talk' }), node('l', 'dlgLine', { speaker: c.id, text: '' }), node('e', 'dlgEnd', { text: '' })],
+      edges: [{ id: 'e0', from: 's', to: 'l', type: 'flow', label: '' }, { id: 'e1', from: 'l', to: 'e', type: 'flow', label: '' }],
+    };
+  }
+
+  /* ---------------- Karakter özellikleri değişken olarak ----------------
+     Karakter sayfasındaki özellikler koşullarda, eylemlerde ve {metin} içinde "karakter.özellik" adıyla
+     kullanılabilir: Tüccar'ın "Yaş: 52" özelliği -> merchant.yas = 52. Sayı / true-false değerler türüyle gelir. */
+  function propVarName(c, key) { return c.id + '.' + slug(key, 'prop'); }
+  function charVars(doc) {
+    const out = [], seen = new Set();
+    for (const c of reg(doc).characters) for (const p of c.props || []) {
+      if (!String(p.key || '').trim()) continue;
+      const name = propVarName(c, p.key);
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const s = plain(p.value, true).trim();
+      const type = /^-?\d+(\.\d+)?$/.test(s) ? 'number' : /^(true|false)$/i.test(s) ? 'bool' : 'string';
+      out.push({ name, type, value: type === 'bool' ? s.toLowerCase() : s, charId: c.id, key: String(p.key).trim() });
+    }
+    return out;
+  }
+  /* Koşullarda kullanılabilen tüm adlar: tanımlı değişkenler + karakter özellikleri */
+  function declaredNames(doc) {
+    return new Set(reg(doc).variables.map((v) => v.name).concat(charVars(doc).map((v) => v.name)));
   }
   function addVariable(doc, name, type, value) {
     const r = ensureReg(doc);
@@ -836,7 +880,7 @@
     const issues = [];
     const R = reg(doc);
     const chars = new Set(R.characters.map((c) => c.id));
-    const declared = new Set(R.variables.map((v) => v.name));
+    const declared = declaredNames(doc);
     const starts = allStarts(doc);
     const idCount = new Map();
     for (const s of starts) idCount.set(s.node.dlgId, (idCount.get(s.node.dlgId) || 0) + 1);
@@ -930,12 +974,37 @@
   /* ---------------- Oyun için JSON ----------------
      Düz şema: tüm düğümler aynı alan adlarını kullanır, değerler metindir.
      Böylece Unity JsonUtility dahil her ayrıştırıcıyla okunabilir. */
+  /* opts.tabId: yalnızca o sekme · opts.tabIds: yalnızca bu sekmeler · opts.owner: yalnızca o karakterin sayfaları */
+  function exportTabs(doc, opts) {
+    opts = opts || {};
+    return doc.tabs.filter((t) => isDialogueTab(t) && (opts.tabId ? t.id === opts.tabId : opts.tabIds ? opts.tabIds.includes(t.id) : opts.owner ? t.owner === opts.owner : true));
+  }
+  /* Sekmelerdeki koşul, eylem ve {metin} içinde geçen adlar ile konuşan karakterler */
+  function usage(tabs) {
+    const names = new Set(), speakers = new Set();
+    const inText = (s) => { String(s || '').replace(/\{([A-Za-z_À-￿][\w.À-￿]*)\}/g, (m, k) => { names.add(k); return m; }); };
+    const expr = (s) => { if (String(s || '').trim()) for (const v of check(s).vars || []) names.add(v); };
+    for (const tab of tabs) {
+      if (tab.owner) speakers.add(tab.owner);
+      for (const n of tab.nodes) {
+        if (n.type === 'dlgLine') { inText(n.text); if (n.speaker) speakers.add(n.speaker); }
+        else if (n.type === 'dlgBranch') expr(n.cond);
+        else if (n.type === 'dlgChoice') { inText(n.text); for (const o of n.options) { inText(o.text); expr(o.cond); } }
+        else if (n.type === 'dlgAction') for (const a of parseActions(n.actions)) if (!a.error && a.type === 'set') { names.add(a.variable); expr(a.value); }
+      }
+    }
+    return { names, speakers };
+  }
+
   function exportData(doc, opts) {
     opts = opts || {};
     const R = reg(doc);
+    const scoped = !!(opts.tabId || opts.tabIds || opts.owner);
+    const tabs = exportTabs(doc, opts);
+    const use = usage(tabs);
     const dialogues = [];
-    for (const tab of doc.tabs) {
-      if (!isDialogueTab(tab) || (opts.tabId && tab.id !== opts.tabId)) continue;
+    for (const tab of tabs) {
+      const owner = tabOwner(doc, tab);
       const nm = new Map(tab.nodes.filter(isFlow).map((n) => [n.id, n]));
       const outs = new Map();
       for (const e of tab.edges) { if (!nm.has(e.to)) continue; if (!outs.has(e.from)) outs.set(e.from, []); outs.get(e.from).push(e); }
@@ -969,14 +1038,23 @@
           }
         }
         const nodes = order.map((id) => exportNode(nm.get(id), outs, resolve, firstNext));
-        dialogues.push({ id: st.dlgId || slug(st.text, 'dialogue'), title: st.text || '', start: first, nodes });
+        const d = { id: st.dlgId || slug(st.text, 'dialogue'), title: st.text || '' };
+        if (owner) d.character = owner.id;   // bu diyalog hangi karakterin sayfasında
+        d.start = first;
+        d.nodes = nodes;
+        dialogues.push(d);
       }
     }
+    const declared = new Set(R.variables.map((v) => v.name));
+    // koşullarda / metinde kullanılan karakter özellikleri oyuna değişken olarak gider (önizlemeyle aynı davransın)
+    const props = charVars(doc).filter((v) => use.names.has(v.name) && !declared.has(v.name));
+    const typed = (v) => ({ name: v.name, type: v.type, defaultValue: String(fmt(typedValue(v.type, v.value), true)) });
     return {
       format: FORMAT, version: FORMAT_VERSION, project: doc.name || '',
-      // karakter sayfasındaki ayrıntılar (açıklama, özellikler, portre) oyuna gitmez
-      characters: R.characters.map((c) => ({ id: c.id, name: plain(c.name, true), color: c.color })),
-      variables: R.variables.map((v) => ({ name: v.name, type: v.type, defaultValue: String(fmt(typedValue(v.type, v.value), true)) })),
+      // karakter sayfasındaki ayrıntılar (açıklama, portre) oyuna gitmez; tek sayfa / karakter aktarımında yalnızca geçen karakterler
+      characters: R.characters.filter((c) => !scoped || use.speakers.has(c.id)).map((c) => ({ id: c.id, name: plain(c.name, true), color: c.color })),
+      // tek sayfa / karakter aktarımında yalnızca o sayfalarda geçen değişkenler
+      variables: R.variables.filter((v) => !scoped || use.names.has(v.name)).map(typed).concat(props.map(typed)),
       dialogues,
     };
   }
@@ -1076,6 +1154,7 @@ public class Dialogue
 {
     public string id;
     public string title;
+    public string character;     // id of the character whose page this dialogue is on (empty if none)
     public string start;         // id of the first node
     public DialogueNode[] nodes;
 
@@ -1177,7 +1256,7 @@ public class DialogueAction
     };
     const out = {};
     if (full.variables.length) out.variables = full.variables.map((v) => ({ name: v.name, value: v.defaultValue }));
-    out.dialogues = full.dialogues.map((d) => Object.assign(put(put({ id: d.id }, 'title', d.title), 'start', d.start), { nodes: d.nodes.map(node) }));
+    out.dialogues = full.dialogues.map((d) => Object.assign(put(put(put({ id: d.id }, 'title', d.title), 'character', d.character ? names.get(d.character) || d.character : ''), 'start', d.start), { nodes: d.nodes.map(node) }));
     return out;
   }
 
@@ -1214,6 +1293,7 @@ public class Dialogue
 {
     public string id;
     public string title;
+    public string character;     // name of the character whose page this dialogue is on (empty if none)
     public string start;         // id of the first node
     public DialogueNode[] nodes;
 
@@ -1276,6 +1356,7 @@ public class DialogueAction
   /* ---------------- Önizleme oynatıcısı ---------------- */
   function initialVars(doc) {
     const v = {};
+    for (const x of charVars(doc)) v[x.name] = typedValue(x.type, x.value);
     for (const x of reg(doc).variables) v[x.name] = typedValue(x.type, x.value);
     return v;
   }
@@ -1378,10 +1459,10 @@ public class DialogueAction
 
   App.Dialogue = {
     TYPES, isDlg, isFlow, isDialogueTab, cleanCharacter, defaults, normalizeNode, newOption, pickLimit, CHAR_COLORS, VAR_TYPES, FORMAT, FORMAT_VERSION,
-    reg, ensureReg, normalizeReg, character, addCharacter, renameCharacter, addVariable, mergeRegistry, slug, uniqueId,
+    reg, ensureReg, normalizeReg, character, addCharacter, renameCharacter, removeCharacter, tabOwner, pagesOf, pageStarter, charVars, declaredNames, propVarName, addVariable, mergeRegistry, slug, uniqueId,
     allStarts, findStart, prepareInsert,
     tokenize, parseExpr, check, evaluate, test, parseActions, splitArgs, interpolate, typedValue, fmt,
     layout, render, renderContext, edgeDecor, nodeColor, hitField, inlineSpec, sync, onConnect, guessSpeaker, previousLine, outEdges,
-    validate, issueMap, exportData, exportUnity, csharpModel, csharpUnityModel, Runner, splitTags,
+    validate, issueMap, exportTabs, exportData, exportUnity, csharpModel, csharpUnityModel, Runner, splitTags,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

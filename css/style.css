@@ -602,6 +602,17 @@ button.dl-target:hover { background: var(--hover); color: var(--text); }
 .pl-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .pl-vars { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow-y: auto; }
 .pl-var { display: grid; grid-template-columns: 1fr 100px; gap: 6px; align-items: center; font-size: 12.5px; }
+.pl-var > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pl-var em { display: block; font-style: normal; font-size: 10.5px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-sub { margin-top: 6px; }
+.pl-char { display: flex; flex-direction: column; gap: 5px; padding: 7px 8px; border: 1px solid var(--border); border-left: 3px solid var(--who); border-radius: 8px; background: var(--panel2); }
+.pl-char-head { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+.pl-char-head .pl-ava { width: 20px; height: 20px; font-size: 11px; }
+.tab-dot.owned { border-radius: 50%; box-shadow: 0 0 0 2px rgba(178, 107, 255, .45); }
+.cp-varnames { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.cp-varnames code { font-size: 11.5px; }
+.cp-pages { display: flex; flex-direction: column; gap: 6px; }
+.dl-owner { width: auto; min-width: 120px; }
 .pl-var .mono { font: 12px "Cascadia Mono", Consolas, monospace; overflow: hidden; text-overflow: ellipsis; }
 .pl-var .input { height: 28px; padding: 0 6px; }
 .pl-var input[type="checkbox"] { justify-self: start; accent-color: var(--accent); width: 16px; height: 16px; }

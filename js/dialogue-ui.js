@@ -55,7 +55,7 @@
     if (!s) { el.textContent = ''; return; }
     const r = D.check(s);
     if (r.error) { el.textContent = '\u26A0 ' + r.error; el.classList.add('bad'); return; }
-    const declared = new Set(D.reg(Store.doc).variables.map((v) => v.name));
+    const declared = D.declaredNames(Store.doc);
     const unknown = r.vars.filter((v) => !declared.has(v));
     if (unknown.length) { el.textContent = $t('Tanımsız değişken: {name}', { name: unknown.join(', ') }); el.classList.add('warn'); return; }
     el.textContent = '\u2713 ' + $t('Geçerli koşul');
@@ -436,7 +436,7 @@
     const uses = doc.tabs.reduce((k, t) => k + t.nodes.filter((n) => n.type === 'dlgLine' && n.speaker === c.id).length, 0);
     const del = h('button', { class: 'icon-btn danger', title: $t('Sil'), html: icon('trash', 15), onclick: async () => {
       if (uses && !(await UI.confirm($t('"{name}" {n} replikte konuşuyor. Yine de silinsin mi? (Replikler konuşmacısız kalır)', { name: c.name, n: uses }), { ok: $t('Sil'), danger: true }))) return;
-      Store.mutate(() => { const r = D.ensureReg(doc); r.characters = r.characters.filter((x) => x !== c); });
+      Store.mutate(() => { D.removeCharacter(doc, c); });
       refresh();
     } });
     return h('div', { class: 'dl-row' }, color, name, del, h('div', { class: 'dl-row-sub' }, id, h('span', { class: 'p-hint' }, $t('{n} replik', { n: uses }))));
@@ -481,8 +481,13 @@
     const tab = Store.tab, doc = Store.doc, R = D.reg(doc);
     const out = [];
     const cnt = (t) => tab.nodes.filter((n) => n.type === t).length;
+    const owner = D.tabOwner(doc, tab);
+    const ownerOpts = [{ value: '', label: $t('(karakter yok)') }].concat(R.characters.map((c) => ({ value: c.id, label: c.name })));
+    if (tab.owner && !owner) ownerOpts.push({ value: tab.owner, label: tab.owner + ' ?' });
     out.push(section($t('Diyalog sekmesi'),
       field($t('Ad'), textInput(tab.name, (v) => { tab.name = v; Store.emit('tabsChanged'); })),
+      field($t('Sayfanın karakteri'), select(ownerOpts, tab.owner || '', (v) => { if (v) tab.owner = v; else delete tab.owner; setTimeout(refresh, 0); }),
+        $t('Bu sayfa bir karakterin konuşmalarıysa seçin; JSON\'da diyaloglar bu karakterle işaretlenir ve karakter ayrı dışa aktarılabilir.')),
       K.tabFontField(tab),
       h('div', { class: 'p-stats' }, stat(cnt('dlgStart'), $t('diyalog')), stat(cnt('dlgLine'), $t('replik')), stat(cnt('dlgChoice'), $t('seçim'))),
       h('div', { class: 'p-row wrap' },
@@ -620,22 +625,38 @@
     }
     function renderVars() {
       const declared = D.reg(doc).variables;
-      const names = [...new Set(declared.map((v) => v.name).concat(Object.keys(runner.vars)))];
-      const typeOf = (nm) => { const d = declared.find((v) => v.name === nm); return d ? d.type : typeof runner.vars[nm] === 'number' ? 'number' : typeof runner.vars[nm] === 'boolean' ? 'bool' : 'string'; };
+      const cvars = D.charVars(doc).filter((v) => !declared.some((d) => d.name === v.name));
+      const cnames = new Set(cvars.map((v) => v.name));
+      const names = [...new Set(declared.map((v) => v.name).concat(Object.keys(runner.vars)))].filter((nm) => !cnames.has(nm));
+      const typeOf = (nm) => {
+        const d = declared.find((v) => v.name === nm) || cvars.find((v) => v.name === nm);
+        return d ? d.type : typeof runner.vars[nm] === 'number' ? 'number' : typeof runner.vars[nm] === 'boolean' ? 'bool' : 'string';
+      };
+      const control = (nm) => {
+        const t = typeOf(nm), cur = runner.vars[nm];
+        let ctl;
+        if (t === 'bool') {
+          ctl = h('input', { type: 'checkbox', checked: !!cur });
+          ctl.addEventListener('change', () => { runner.vars[nm] = ctl.checked; changed(); });
+        } else {
+          ctl = h('input', { class: 'input mono', value: cur == null ? '' : D.fmt(cur, true) });
+          ctl.addEventListener('change', () => { runner.vars[nm] = D.typedValue(t, ctl.value); changed(); });
+        }
+        return ctl;
+      };
+      // karakter özellikleri: karakter başına grup; koşullarda "karakter.özellik" adıyla
+      const groups = [];
+      for (const c of D.reg(doc).characters) {
+        const mine = cvars.filter((v) => v.charId === c.id);
+        if (!mine.length) continue;
+        groups.push(h('div', { class: 'pl-char', style: { '--who': c.color } },
+          h('div', { class: 'pl-char-head' }, h('span', { class: 'pl-ava' }, c.portrait ? h('img', { src: c.portrait, alt: '' }) : (String(c.name).trim()[0] || '?').toUpperCase()), h('b', null, c.name)),
+          ...mine.map((v) => h('label', { class: 'pl-var', title: v.name }, h('span', null, v.key, h('em', { class: 'mono' }, v.name)), control(v.name)))));
+      }
       varsEl.replaceChildren(h('div', { class: 'p-title' }, $t('Değişkenler')),
         ...(names.length ? [] : [h('div', { class: 'p-hint' }, $t('Tanımlı değişken yok.'))]),
-        ...names.map((nm) => {
-          const t = typeOf(nm), cur = runner.vars[nm];
-          let ctl;
-          if (t === 'bool') {
-            ctl = h('input', { type: 'checkbox', checked: !!cur });
-            ctl.addEventListener('change', () => { runner.vars[nm] = ctl.checked; changed(); });
-          } else {
-            ctl = h('input', { class: 'input mono', value: cur == null ? '' : D.fmt(cur, true) });
-            ctl.addEventListener('change', () => { runner.vars[nm] = D.typedValue(t, ctl.value); changed(); });
-          }
-          return h('label', { class: 'pl-var' }, h('span', { class: 'mono' }, nm), ctl);
-        }));
+        ...names.map((nm) => h('label', { class: 'pl-var' }, h('span', { class: 'mono' }, nm), control(nm))),
+        ...(groups.length ? [h('div', { class: 'p-title pl-sub' }, $t('Karakter özellikleri'))].concat(groups) : []));
     }
     // değişken elle değişince bekleyen seçimin koşullarını yeniden hesapla
     function changed() {
@@ -671,12 +692,19 @@
   }
 
   /* ---------------- JSON dışa aktarım ---------------- */
-  /* target: 'full' (tüm ayrıntılar) ya da 'unity' (yalnızca diyaloglar, seçimler ve sonuçları) */
-  function exportDialog(target) {
+  /* target: 'full' (tüm ayrıntılar) ya da 'unity' (yalnızca diyaloglar, seçimler ve sonuçları)
+     scope: 'all' | 'tab' (bu sekme) | 'char' (owner karakterinin sayfaları) */
+  function exportDialog(target, scope, owner) {
     const doc = Store.doc;
     if (!doc.tabs.some(D.isDialogueTab)) { UI.toast($t('Belgede diyalog sekmesi yok'), 'warn'); return; }
     const onDlgTab = D.isDialogueTab(Store.tab);
-    const opts = { scope: 'all', pretty: true, target: target === 'unity' ? 'unity' : 'full' };
+    // sayfası olan karakterler
+    const owners = D.reg(doc).characters.filter((c) => D.pagesOf(doc, c.id).length);
+    const cur = D.tabOwner(doc, Store.tab);
+    const opts = { scope: 'all', pretty: true, target: target === 'unity' ? 'unity' : 'full', owner: owner || (cur && owners.includes(cur) ? cur.id : owners.length ? owners[0].id : '') };
+    if (scope === 'tab' && onDlgTab) opts.scope = 'tab';
+    if (scope === 'char' && opts.owner) opts.scope = 'char';
+    const sel = () => (opts.scope === 'tab' ? { tabId: Store.tab.id } : opts.scope === 'char' ? { owner: opts.owner } : {});
     const seg = (key, options) => {
       const w = h('div', { class: 'seg' });
       for (const [v, l] of options) {
@@ -690,16 +718,19 @@
     const summary = h('div', { class: 'dl-sum' });
     const intro = h('p', { class: 'modal-text' });
     let text = '';
+    const ownerSel = h('select', { class: 'input dl-owner' }, owners.map((c) => h('option', { value: c.id, selected: c.id === opts.owner }, c.name)));
+    ownerSel.addEventListener('change', () => { opts.owner = ownerSel.value; update(); });
     const update = () => {
-      const tabId = opts.scope === 'tab' ? Store.tab.id : null;
       const unity = opts.target === 'unity';
-      const data = unity ? D.exportUnity(doc, { tabId }) : D.exportData(doc, { tabId });
+      ownerSel.hidden = opts.scope !== 'char';
+      const data = unity ? D.exportUnity(doc, sel()) : D.exportData(doc, sel());
       text = JSON.stringify(data, null, opts.pretty ? 2 : 0);
       ta.value = text;
       intro.textContent = unity
         ? $t('Unity için sade JSON: yalnızca diyaloglar, replikler, seçimler ve sonuçları. Renkler, karakter listesi, duygu / ses / etiket ve biçim bilgisi yazılmaz; konuşmacı adıyla gelir.')
         : $t('Oyun motorunuzun okuyacağı JSON. Her diyalog bir Başlangıç düğümüdür; düğümler kimlikleriyle birbirine bağlanır.');
-      const issues = D.validate(doc, tabId);
+      const inScope = new Set(D.exportTabs(doc, sel()).map((t) => t.id));
+      const issues = D.validate(doc).filter((i) => inScope.has(i.tab));
       const errs = issues.filter((i) => i.level === 'error');
       const nodes = data.dialogues.reduce((k, d) => k + d.nodes.length, 0);
       const choices = data.dialogues.reduce((k, d) => k + d.nodes.reduce((j, n) => j + (n.choices || n.options || []).length, 0), 0);
@@ -712,12 +743,31 @@
             h('ul', null, errs.slice(0, 5).map((i) => h('li', null, i.msg + (i.node && Store.node(i.node, doc.tabs.find((t) => t.id === i.tab)) ? ' \u2014 ' + describe(Store.node(i.node, doc.tabs.find((t) => t.id === i.tab))) : '')))))
           : h('div', { class: 'p-hint dl-hint ok' }, '\u2713 ' + (issues.length ? $t('Hata yok ({w} uyarı)', { w: issues.length }) : $t('Sorun bulunamadı'))));
     };
-    const fileName = () => U.safeFileName(Store.doc.name) + (opts.scope === 'tab' ? '-' + U.safeFileName(Store.tab.name) : '') + (opts.target === 'unity' ? '.unity' : '') + '.dialogue.json';
+    const ownerName = () => { const c = D.character(doc, opts.owner); return c ? c.name : opts.owner; };
+    const fileName = () => U.safeFileName(Store.doc.name) + (opts.scope === 'tab' ? '-' + U.safeFileName(Store.tab.name) : opts.scope === 'char' ? '-' + U.safeFileName(ownerName()) : '') + (opts.target === 'unity' ? '.unity' : '') + '.dialogue.json';
+    const csharp = () => (opts.target === 'unity' ? D.csharpUnityModel() : D.csharpModel());
+    /* Her diyalog sayfası ayrı JSON dosyası; C# sınıfları da zip'e eklenir */
+    const zipPages = () => {
+      const unity = opts.target === 'unity';
+      const taken = new Set();
+      const files = doc.tabs.filter(D.isDialogueTab).map((t) => {
+        let base = U.safeFileName(t.name, 'dialogue'), name = base, k = 2;
+        while (taken.has(name.toLowerCase())) name = base + '-' + k++;
+        taken.add(name.toLowerCase());
+        const data = unity ? D.exportUnity(doc, { tabId: t.id }) : D.exportData(doc, { tabId: t.id });
+        return { name: name + (unity ? '.unity' : '') + '.dialogue.json', data: JSON.stringify(data, null, opts.pretty ? 2 : 0) };
+      });
+      files.push({ name: 'DialogueData.cs', data: csharp(), bom: true });
+      const zipName = U.safeFileName(doc.name) + (unity ? '-unity' : '') + '-dialogues.zip';
+      U.download(zipName, new Blob([App.Zip.build(files)], { type: 'application/zip' }));
+      UI.toast($t('{n} sayfa ayrı JSON olarak indirildi', { n: files.length - 1 }), 'ok');
+    };
     const body = h('div', null,
       intro,
       h('div', { class: 'p-row wrap dl-export-opts' },
         h('label', { class: 'p-field' }, h('span', { class: 'p-label' }, $t('Hedef')), seg('target', [['unity', $t('Unity (sade)')], ['full', $t('Tam')]])),
-        onDlgTab ? h('label', { class: 'p-field' }, h('span', { class: 'p-label' }, $t('Kapsam')), seg('scope', [['all', $t('Tüm diyalog sekmeleri')], ['tab', $t('Yalnızca bu sekme')]])) : null,
+        h('div', { class: 'p-field' }, h('span', { class: 'p-label' }, $t('Kapsam')),
+          h('div', { class: 'p-row' }, seg('scope', [['all', $t('Tüm diyalog sekmeleri')]].concat(onDlgTab ? [['tab', $t('Yalnızca bu sekme')]] : [], owners.length ? [['char', $t('Karakter')]] : [])), ownerSel)),
         h('label', { class: 'p-field' }, h('span', { class: 'p-label' }, $t('Biçim')), seg('pretty', [[true, $t('Okunaklı')], [false, $t('Sıkıştırılmış')]]))),
       summary, ta,
       h('details', { class: 'p-help' }, h('summary', null, $t('Oyunda nasıl kullanılır?')),
@@ -725,7 +775,8 @@
     UI.modal({
       title: $t('Diyalog JSON dışa aktar'), wide: true, body, noFocus: true,
       buttons: [
-        { label: $t('Unity C# sınıfları'), icon: 'code', action: () => { U.download('DialogueData.cs', '\uFEFF' + (opts.target === 'unity' ? D.csharpUnityModel() : D.csharpModel()), 'text/plain'); return false; } },
+        { label: $t('Unity C# sınıfları'), icon: 'code', action: () => { U.download('DialogueData.cs', '\uFEFF' + csharp(), 'text/plain'); return false; } },
+        { label: $t('Sayfalar ayrı ayrı (.zip)'), icon: 'export', action: () => { zipPages(); return false; } },
         { spacer: true },
         { label: $t('Kopyala'), icon: 'copy', action: () => { UI.copyText(text); return false; } },
         { label: $t('İndir (.json)'), primary: true, icon: 'export', action: () => { U.download(fileName(), text, 'application/json'); UI.toast($t('İndirildi: {name}', { name: fileName() }), 'ok'); } },

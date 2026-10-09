@@ -71,7 +71,7 @@
     const n = linesOf(c.id).length;
     const msg = n ? $t('"{name}" {n} replikte konuşuyor. Yine de silinsin mi? (Replikler konuşmacısız kalır)', { name: c.name, n }) : $t('"{name}" silinsin mi?', { name: c.name });
     if (!(await UI.confirm(msg, { ok: $t('Sil'), danger: true }))) return;
-    Store.mutate(() => { const r = D.ensureReg(Store.doc); r.characters = r.characters.filter((x) => x !== c); });
+    Store.mutate(() => { D.removeCharacter(Store.doc, c); });
     selId = null;
     render();
   }
@@ -231,6 +231,20 @@
       return b;
     }));
 
+    // özelliklerin koşullarda / metinde kullanılan adları (ör. merchant.yas)
+    const varNames = D.charVars(doc).filter((v) => v.charId === c.id);
+    const varHint = varNames.length
+      ? h('div', { class: 'p-hint cp-varnames' }, $t('Koşullarda ve metinde şu adlarla:') + ' ', ...varNames.map((v) => h('code', { title: v.key + ' = ' + (v.value || '""') }, v.name)))
+      : null;
+
+    // bu karakterin diyalog sayfaları
+    const pages = D.pagesOf(doc, c.id);
+    const goPage = (t) => { close(); Store.setActiveTab(t.id); };
+    const pageList = h('div', { class: 'cp-pages' },
+      pages.map((t) => h('button', { class: 'cp-line', onclick: () => goPage(t) }, h('span', { class: 'cp-line-tab' }, $t('Sayfa')), h('span', null, t.name))),
+      h('div', { class: 'p-row wrap' },
+        h('button', { class: 'btn small', onclick: () => { close(); App.Actions.addCharacterPage(c.id); }, html: icon('plus', 14) + `<span>${U.esc($t('Yeni diyalog sayfası'))}</span>` })));
+
     // replikler
     const lines = linesOf(c.id);
     const lineList = h('div', { class: 'cp-lines' }, lines.slice(0, 30).map(({ tab, node }) => {
@@ -248,12 +262,15 @@
         rows,
         h('datalist', { id: 'cp-prop-keys' }, suggestions.map((s) => h('option', { value: s }))),
         h('div', { class: 'p-row wrap' }, h('button', { class: 'btn small', onclick: () => addProp(''), html: icon('plus', 14) + `<span>${U.esc($t('Özellik ekle'))}</span>` })),
-        chips),
+        chips, varHint),
+      h('section', { class: 'cp-sec' }, h('div', { class: 'p-title' }, $t('Diyalog sayfaları') + ' (' + pages.length + ')'),
+        h('div', { class: 'p-hint' }, $t('Bu karakterin konuşmalarını ayrı sayfalarda yazın; her sayfa ayrı JSON olarak dışa aktarılabilir.')),
+        pageList),
       h('section', { class: 'cp-sec' }, h('div', { class: 'p-title' }, $t('Replikler') + ' (' + lines.length + ')'),
         lines.length ? lineList : h('div', { class: 'p-hint' }, $t('Bu karakter henüz hiçbir replikte konuşmuyor.'))),
       h('div', { class: 'cp-actions' },
         h('button', { class: 'btn primary', onclick: () => addToScene(c.id), html: icon('plus', 15) + `<span>${U.esc($t('Sahneye ekle'))}</span>` }),
-        h('span', { class: 'p-hint' }, $t('Açıklama, özellikler ve portre yalnızca tasarım içindir; oyun JSON\'una gitmez.')),
+        h('span', { class: 'p-hint' }, $t('Açıklama ve portre yalnızca tasarım içindir; özellikler yalnızca koşullarda ya da metinde kullanılırsa oyun JSON\'una değişken olarak gider.')),
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn danger', onclick: () => remove(c), html: icon('trash', 15) + `<span>${U.esc($t('Sil'))}</span>` })));
   }

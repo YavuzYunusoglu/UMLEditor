@@ -249,10 +249,13 @@ Working with dialogues:
 - **Double-click** a line's text to write it, its header to change the speaker, or an option row of a choice to edit that option.
 - **Character page:** the **Characters** button in the tab bar (on dialogue tabs) opens a separate page for the cast. Each character has a portrait, colour, ID, role/title, a description written in Markdown with a live preview, and free-form properties (age, goal, fear, speech style… or anything you add). The page also lists every line the character speaks.
 - **Character cards:** on a dialogue tab the palette has a **Characters** section. Drag a character onto the canvas (or use **Add to scene** on the character page) to place a character card that shows the portrait, role, description and properties. Cards update when you edit the character. Drag from a card's edge into empty space to start a new line spoken by that character.
+- **Character pages:** a dialogue tab can belong to a character (**Page character** in the panel, or right-click the tab). Use **+ → Character page (dialogue)** or **New dialogue page** on the character page to open a page for one character, so each NPC's conversations live on their own page. The tab dot takes the character's colour, and the exported dialogues carry a `character` field.
+- **Character properties in conditions:** the properties on the character page can be used as `character.property` in conditions, actions and `{text}`. For example, the merchant's *Age: 52* becomes `merchant.age` and can be checked with `merchant.age > 50`. Numbers and true/false values keep their type. Properties that a condition or text uses are exported as variables.
 - **Markdown:** lines, choice options and the character page support `**bold**`, `*italic*`, `` `code` ``, `~~strikethrough~~`, `# headings`, `- lists` and `> quotes`. They are rendered on the canvas and in the preview, but the JSON export contains plain text without the Markdown marks.
 - **Font size:** with nothing selected, the properties panel has a **Font size** setting for the whole tab (shapes, connection labels and shapes you add later). Selected shapes have their own **Font size** setting. This works for class diagrams and flowcharts too. Shapes grow around their centre, so you may want to run **Layout** afterwards.
 - **Checks:** problems such as unconnected options, missing speakers, condition syntax errors, undeclared variables, unreachable nodes and duplicate IDs are marked with a badge on the node and listed in the panel. Click a problem to jump to the node.
 - **Play:** the **Play** button opens a preview that runs the dialogue the way the game would. While it runs you can change variables, pick options with the number keys, see locked options and why they are locked, and jump from any message back to its node on the canvas.
+  The right side of the preview lists the variables and, under **Character properties**, each character's properties. You can change any of them while you test.
 
 **Exporting to the game:** **Export → Dialogue JSON…** creates the JSON your game reads, either for all dialogue tabs or only the current one. Each conversation lists its nodes, and the nodes point to each other by ID:
 
@@ -311,6 +314,8 @@ Character cards and the character page details (portrait, role, description, pro
 ```
 
 With **Unity (simple)** selected, the **Unity C# classes** button downloads the matching `DialogueData.cs` (same class names, with `DialogueChoice[] choices`).
+
+**Exporting pages separately:** in the export dialog, **Scope** can be all dialogue tabs, only the current tab, or one **Character** (all pages that belong to that character). **Each page separately (.zip)** downloads one JSON file per dialogue page, together with `DialogueData.cs`, for the selected target. When you export a single page or character, the file only includes the characters and variables those pages use.
 
 The dialogue design is saved with the rest of the document (`.uml.json`, autosave and Google Drive), so you keep editing it there. The exported JSON is the copy for the game.
 

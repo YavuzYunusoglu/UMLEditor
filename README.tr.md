@@ -249,10 +249,13 @@ Diyaloglarla çalışma:
 - Replik metnine **çift tıklayarak** yazın, başlığına çift tıklayarak konuşmacıyı değiştirin, seçim düğümündeki bir seçenek satırına çift tıklayarak o seçeneği düzenleyin.
 - **Karakter sayfası:** diyalog sekmesindeyken sekme çubuğundaki **Karakterler** düğmesi oyuncu kadrosu için ayrı bir sayfa açar. Her karakterin portresi, rengi, kimliği, rolü/unvanı, Markdown ile yazılan ve canlı önizlemesi olan bir açıklaması ve serbest özellikleri (yaş, amaç, korku, konuşma tarzı… ya da istediğiniz herhangi bir şey) vardır. Sayfa ayrıca karakterin konuştuğu tüm replikleri listeler.
 - **Kişi kartları:** diyalog sekmesinde paletin bir **Karakterler** bölümü vardır. Bir karakteri tuvale sürükleyince (ya da karakter sayfasındaki **Sahneye ekle** ile) portresini, rolünü, açıklamasını ve özelliklerini gösteren bir kişi kartı oluşur. Karakteri düzenleyince kart da güncellenir. Kartın kenarından boşluğa sürüklerseniz o karakterin konuştuğu yeni bir replik başlar.
+- **Karakter sayfaları:** bir diyalog sekmesi bir karaktere ait olabilir (paneldeki **Sayfanın karakteri** ya da sekmeye sağ tık). **+ → Karakter sayfası (diyalog)** ya da karakter sayfasındaki **Yeni diyalog sayfası** ile bir karakter için sayfa açabilirsiniz. Böylece her NPC'nin konuşmaları kendi sayfasında durur. Sekme noktası karakterin rengini alır ve dışa aktarılan diyaloglarda `character` alanı bulunur.
+- **Koşullarda karakter özellikleri:** karakter sayfasındaki özellikler koşullarda, eylemlerde ve `{metin}` içinde `karakter.özellik` adıyla kullanılabilir. Örneğin tüccarın *Yaş: 52* özelliği `merchant.yas` olur ve `merchant.yas > 50` ile denetlenebilir. Sayılar ve true/false değerler türlerini korur. Bir koşulda ya da metinde kullanılan özellikler dışa aktarımda değişken olarak yazılır.
 - **Markdown:** replikler, seçenekler ve karakter sayfası `**kalın**`, `*italik*`, `` `kod` ``, `~~üstü çizili~~`, `# başlık`, `- liste` ve `> alıntı` biçimlerini destekler. Bunlar tuvalde ve önizlemede biçimli görünür; JSON dışa aktarımında ise Markdown işaretleri olmadan düz metin olarak yer alır.
 - **Yazı boyutu:** hiçbir şey seçili değilken özellikler panelindeki **Yazı boyutu** ayarı tüm sekmeye uygulanır (şekiller, bağlantı etiketleri ve sonradan eklenen şekiller). Seçili şekillerin de kendi **Yazı boyutu** ayarı vardır. Bu ayar sınıf diyagramlarında ve akış şemalarında da çalışır. Şekiller merkezlerinden büyüdüğü için ardından **Yerleşim** çalıştırmak isteyebilirsiniz.
 - **Kontrol:** bağlanmamış seçenekler, eksik konuşmacılar, koşul yazım hataları, tanımsız değişkenler, ulaşılamayan düğümler ve aynı kimliği kullanan başlangıçlar gibi sorunlar düğümün üzerinde bir işaretle gösterilir ve panelde listelenir. Bir soruna tıklayınca o düğüme gidilir.
 - **Oynat:** **Oynat** düğmesi diyaloğu oyundaki gibi çalıştıran bir önizleme açar. Önizleme sırasında değişkenleri değiştirebilir, seçenekleri rakam tuşlarıyla seçebilir, kilitli seçenekleri ve neden kilitli olduklarını görebilir, her mesajdan tuvaldeki düğümüne gidebilirsiniz.
+  Önizlemenin sağ tarafında değişkenler ve **Karakter özellikleri** başlığı altında her karakterin özellikleri listelenir. Denerken hepsini değiştirebilirsiniz.
 
 **Oyuna aktarma:** **Dışa Aktar → Diyalog JSON…** oyununuzun okuyacağı JSON'u tüm diyalog sekmeleri ya da yalnızca bu sekme için üretir. Her konuşma kendi düğümlerini listeler ve düğümler birbirine kimlikleriyle bağlanır:
 
@@ -311,6 +314,8 @@ Kişi kartları ve karakter sayfasındaki ayrıntılar (portre, rol, açıklama,
 ```
 
 **Unity (sade)** seçiliyken **Unity C# sınıfları** düğmesi buna uyan `DialogueData.cs` dosyasını indirir (aynı sınıf adları, `DialogueChoice[] choices` ile).
+
+**Sayfaları ayrı aktarma:** dışa aktarım penceresinde **Kapsam** tüm diyalog sekmeleri, yalnızca bu sekme ya da bir **Karakter** (o karaktere ait tüm sayfalar) olabilir. **Sayfalar ayrı ayrı (.zip)** düğmesi seçili hedef için her diyalog sayfasını ayrı bir JSON dosyası olarak, `DialogueData.cs` ile birlikte indirir. Tek sayfa ya da tek karakter aktarıldığında dosyada yalnızca o sayfalarda geçen karakterler ve değişkenler bulunur.
 
 Diyalog tasarımı belgenin geri kalanıyla birlikte kaydedilir (`.uml.json`, otomatik kayıt ve Google Drive); düzenlemeye orada devam edersiniz. Dışa aktarılan JSON oyun için hazırlanan kopyadır.
 

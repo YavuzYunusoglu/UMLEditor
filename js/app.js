@@ -54,6 +54,29 @@
       Store.setActiveTab(t.id);
       return t;
     },
+    /* Karakter sayfası: karaktere ait yeni diyalog sekmesi (Başlangıç -> karakterin repliği -> Bitiş) */
+    addCharacterPage(charId) {
+      const D = App.Dialogue;
+      const c = D.character(Store.doc, charId);
+      if (!c) return null;
+      const t = Model.newTab(uniqueTabName($t('Diyalog: {name}', { name: c.name })), 'dialogue');
+      t.owner = c.id;
+      const frag = D.pageStarter(c);
+      D.prepareInsert(Store.doc, frag);
+      App.Layout.layered(frag.nodes, frag.edges, {});
+      Store.mutate(() => {
+        Store.insertFragment(frag, t);
+        Store.doc.tabs.push(t);
+      });
+      Store.setActiveTab(t.id);
+      return t;
+    },
+    setTabOwner(id, charId) {
+      const t = Store.doc.tabs.find((x) => x.id === id);
+      if (!t) return;
+      Store.mutate(() => { if (charId) t.owner = charId; else delete t.owner; });
+      App.Panel.render();
+    },
     async renameTab(id) {
       const t = Store.doc.tabs.find((x) => x.id === id);
       if (!t) return;
@@ -607,8 +630,10 @@
     for (const t of Store.doc.tabs) {
       const isDlgTab = App.Dialogue.isDialogueTab(t);
       const isFlow = !isDlgTab && t.nodes.length && t.nodes.filter((n) => n.type !== 'class').length > t.nodes.length / 2;
-      const el = h('div', { class: 'tab' + (t.id === Store.doc.activeTab ? ' active' : ''), title: $t('{name} — çift tıkla: yeniden adlandır', { name: t.name }) },
-        h('span', { class: 'tab-dot' + (isDlgTab ? ' dlg' : isFlow ? ' flow' : '') }),
+      const owner = isDlgTab ? App.Dialogue.tabOwner(Store.doc, t) : null;
+      const title = $t('{name} — çift tıkla: yeniden adlandır', { name: t.name }) + (owner ? ' · ' + $t('Karakter sayfası: {name}', { name: owner.name }) : '');
+      const el = h('div', { class: 'tab' + (t.id === Store.doc.activeTab ? ' active' : ''), title },
+        h('span', { class: 'tab-dot' + (isDlgTab ? ' dlg' : isFlow ? ' flow' : '') + (owner ? ' owned' : ''), style: owner ? { background: owner.color } : null }),
         h('span', { class: 'tab-name' }, t.name),
         h('button', { class: 'tab-close', title: $t('Sekmeyi kapat'), html: icon('x', 12), onclick: (e) => { e.stopPropagation(); Actions.closeTab(t.id); } }));
       el.addEventListener('pointerdown', (e) => { if (e.button === 0) Store.setActiveTab(t.id); if (e.button === 1) { e.preventDefault(); Actions.closeTab(t.id); } });
@@ -620,6 +645,7 @@
           { label: $t('Çoğalt'), icon: 'copy', action: () => Actions.duplicateTab(t.id) },
           { label: $t('Sola taşı'), action: () => Actions.moveTab(t.id, -1) },
           { label: $t('Sağa taşı'), action: () => Actions.moveTab(t.id, 1) },
+          isDlgTab ? { label: $t('Sayfanın karakteri'), icon: 'users', submenu: ownerMenu(t) } : null,
           { sep: true },
           { label: $t('Sekmeyi sil'), icon: 'trash', action: () => Actions.closeTab(t.id) },
         ]);
@@ -633,6 +659,15 @@
       if (l < bar.scrollLeft) bar.scrollLeft = l;
       else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth;
     }
+  }
+
+  function ownerMenu(t) {
+    const chars = App.Dialogue.reg(Store.doc).characters;
+    return [
+      { label: $t('(karakter yok)'), checked: !t.owner, action: () => Actions.setTabOwner(t.id, '') },
+      ...(chars.length ? [{ sep: true }] : []),
+      ...chars.map((c) => ({ label: c.name, checked: t.owner === c.id, action: () => Actions.setTabOwner(t.id, c.id) })),
+    ];
   }
 
   function renameTabInline(el, t) {
@@ -911,6 +946,7 @@ public class Enemy : MonoBehaviour, IDamageable {
     App.Layout.layered(dfrag.nodes, dfrag.edges, {});
     Store.insertFragment(dfrag, dt);
     App.Dialogue.mergeRegistry(doc, dfrag);
+    dt.owner = 'merchant';   // örnek: bu sayfa tüccarın konuşmaları
     doc.tabs.push(dt);
     return doc;
   }
@@ -963,6 +999,7 @@ public class Enemy : MonoBehaviour, IDamageable {
         { label: $t('Sınıf diyagramı'), icon: 'unity', action: () => Actions.addTab(null, 'class') },
         { label: $t('Akış şeması'), icon: 'layout', action: () => Actions.addTab(null, 'flow') },
         { label: $t('Oyun diyaloğu'), icon: 'chat', action: () => Actions.addTab(null, 'dialogue') },
+        ...(App.Dialogue.reg(Store.doc).characters.length ? [{ label: $t('Karakter sayfası (diyalog)'), icon: 'users', submenu: App.Dialogue.reg(Store.doc).characters.map((c) => ({ label: c.name, action: () => Actions.addCharacterPage(c.id) })) }] : []),
       ]);
     });
     window.addEventListener('beforeunload', () => autosave.flush());

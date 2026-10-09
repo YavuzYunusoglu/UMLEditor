@@ -627,6 +627,69 @@ test('Karakter kaydı: ayrıntılar temizlenir, geçersiz portre atılır', () =
   assert.ok(DL.cleanCharacter({ id: 'b', portrait: 'data:image/jpeg;base64,AAAA' }).portrait);
 });
 
+test('Diyalog: karakter özellikleri koşullarda ve metinde değişken olarak', () => {
+  const doc = dialogueDoc('dlgShop');
+  const tab = doc.tabs[0];
+  const ch = DL.reg(doc).characters[0];
+  ch.props = [{ key: 'Yaş', value: '52' }, { key: 'Güven', value: 'true' }, { key: 'Meslek', value: '**tüccar**' }, { key: '', value: 'x' }];
+  const cv = plain(DL.charVars(doc));
+  assert.deepStrictEqual(cv.map((v) => [v.name, v.type, v.value]), [[ch.id + '.yas', 'number', '52'], [ch.id + '.guven', 'bool', 'true'], [ch.id + '.meslek', 'string', 'tüccar']]);
+  const line = tab.nodes.find((n) => n.type === 'dlgLine');
+  line.text = '{' + ch.id + '.meslek} yaşı {' + ch.id + '.yas}';
+  tab.nodes.find((n) => n.type === 'dlgChoice').options[1].cond = ch.id + '.guven and ' + ch.id + '.yas > 50';
+  assert.ok(!DL.validate(doc).some((i) => /Undeclared|Tanımsız/.test(i.msg)), 'özellik adları tanımlı sayılır');
+  const r = new DL.Runner(doc);
+  let res = r.run(DL.allStarts(doc)[0]);
+  assert.strictEqual(res.stop.text, 'tüccar yaşı 52');
+  res = r.run(res.stop.next);
+  assert.strictEqual(res.stop.options[1].available, true);
+  r.vars[ch.id + '.yas'] = 30;
+  res = r.run({ tab: res.stop.tab, node: res.stop.node });
+  assert.strictEqual(res.stop.options[1].available, false);
+  // yalnızca kullanılan özellikler oyuna değişken olarak gider
+  const vars = DL.exportData(doc).variables.map((v) => v.name);
+  assert.ok(vars.includes(ch.id + '.yas') && vars.includes(ch.id + '.guven') && vars.includes(ch.id + '.meslek'));
+  ch.props.push({ key: 'Korku', value: 'karanlık' });
+  assert.ok(!DL.exportData(doc).variables.some((v) => v.name === ch.id + '.korku'));
+  assert.ok(DL.exportUnity(doc).variables.some((v) => v.name === ch.id + '.yas' && v.value === '52'));
+});
+test('Diyalog: karakter sayfaları ayrı dışa aktarılır', () => {
+  const doc = dialogueDoc('dlgShop');
+  const shop = doc.tabs[0];
+  const merchant = DL.reg(doc).characters[0];
+  const guard = DL.addCharacter(doc, 'Muhafız');
+  shop.owner = merchant.id;
+  // muhafızın sayfası
+  const t2 = App.Model.newTab('Muhafız', 'dialogue');
+  t2.owner = guard.id;
+  const frag = DL.pageStarter(guard);
+  DL.prepareInsert(doc, frag);
+  App.Store.insertFragment(frag, t2);
+  doc.tabs.push(t2);
+  assert.deepStrictEqual(plain(DL.pagesOf(doc, guard.id).map((t) => t.id)), [t2.id]);
+  const all = DL.exportData(doc);
+  assert.strictEqual(all.dialogues.length, 2);
+  assert.deepStrictEqual(plain(all.dialogues.map((d) => d.character)), [merchant.id, guard.id]);
+  const g = DL.exportData(doc, { owner: guard.id });
+  assert.strictEqual(g.dialogues.length, 1);
+  assert.deepStrictEqual(plain(g.characters.map((c) => c.id)), [guard.id], 'yalnızca bu sayfada geçen karakterler');
+  assert.strictEqual(g.dialogues[0].nodes[0].speaker, guard.id);
+  const u = DL.exportUnity(doc, { tabId: shop.id });
+  assert.strictEqual(u.dialogues.length, 1);
+  assert.strictEqual(u.dialogues[0].character, merchant.name);
+  assert.deepStrictEqual(plain(Object.keys(u.dialogues[0])), ['id', 'title', 'character', 'start', 'nodes']);
+  // kimlik değişince sayfa izler; karakter silinince sayfa sahipsiz kalır
+  DL.renameCharacter(doc, guard, 'guard');
+  assert.strictEqual(t2.owner, 'guard');
+  DL.removeCharacter(doc, guard);
+  assert.ok(!('owner' in t2));
+  // normalize: sahip yalnızca diyalog sekmelerinde kalır
+  const d = App.Model.normalize({ tabs: [{ name: 'a', owner: 'x', nodes: [], edges: [] }, { name: 'b', kind: 'dialogue', owner: 'y', nodes: [], edges: [] }] });
+  assert.ok(!('owner' in d.tabs[0]));
+  assert.strictEqual(d.tabs[1].owner, 'y');
+  for (const k of ['public string character;']) assert.ok(DL.csharpModel().includes(k) && DL.csharpUnityModel().includes(k), k);
+});
+
 /* ---------- Çeviri (i18n) ---------- */
 const { collect } = require('./i18n-keys');
 const EN = App.I18n.DICTS.en;
