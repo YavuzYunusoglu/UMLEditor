@@ -2,7 +2,7 @@
 
 **Visit the site with github pages: <https://yavuzyunusoglu.github.io/UMLEditor/>**
 
-A free, offline-first **UML class diagram and flowchart editor** for the browser, with **Unity shortcuts** and **C# import/export**. It runs in the browser and works on desktop, tablet and phone. There is nothing to install, and an optional **Google Drive** sync lets you start a diagram on one device and continue on another.
+A free, offline-first **UML class diagram and flowchart editor** for the browser, with **Unity shortcuts** and **C# import/export**. It also includes a **game dialogue editor** for narrative designers, with a playtest preview and JSON export for your game. It runs in the browser and works on desktop, tablet and phone. There is nothing to install, and an optional **Google Drive** sync lets you start a diagram on one device and continue on another.
 
 > [!IMPORTANT]
 > **This project was generated with AI.**
@@ -31,6 +31,7 @@ A free, offline-first **UML class diagram and flowchart editor** for the browser
   - [Google Drive sync](#8-google-drive-sync)
   - [Tablet and phone](#9-tablet-and-phone)
   - [Command palette and shortcuts](#10-command-palette-and-keyboard-shortcuts)
+  - [Game dialogues (narrative design)](#11-game-dialogues-narrative-design)
 - [Member syntax](#member-syntax)
 - [Publishing on GitHub Pages](#publishing-on-github-pages)
 - [Setting up Google Drive](#setting-up-google-drive-one-time-5-minutes)
@@ -49,6 +50,7 @@ A free, offline-first **UML class diagram and flowchart editor** for the browser
 |---|---|
 | **Class diagrams** | Classes, abstract classes, interfaces, enums, structs, notes and packages/groups. There are seven relationship types (association, inheritance, realization, dependency, aggregation, composition, link) with multiplicity labels. |
 | **Flowcharts** | Start/end, process, decision, input/output, loop (preparation), subprocess, document, connector and free text. |
+| **Game dialogues** | A node editor for narrative designers: lines, player choices, conditions, actions/events and jumps, with shared characters and variables. Problems are checked live, a playtest preview runs the dialogue like the game would, and **Dialogue JSON** export comes with matching Unity C# data classes. |
 | **Unity shortcuts** | One-click MonoBehaviour, ScriptableObject, Singleton, `[Serializable]`, Custom Editor, EditorWindow, StateMachineBehaviour and more. It also includes ready-made **design patterns**, **loop/flow templates** and menus for **Unity messages and fields**. |
 | **C# export** | Unity-ready `.cs` files in a `.zip`, including `[SerializeField]`, `[CreateAssetMenu]`, `[CustomEditor]`, singleton boilerplate, interface stubs, and an `Editor/` folder for editor scripts. |
 | **C# import** | Drop `.cs` files or a whole `Assets/Scripts` folder to get a class diagram. Fields, properties, methods, inheritance and references are detected automatically. |
@@ -226,6 +228,65 @@ Press `Ctrl+K` (or `/`) to search every shape, Unity template and command.
 
 Box selection works like most CAD tools: dragging to the right selects shapes **fully inside** the box, and dragging to the left selects shapes the box **touches**.
 
+### 11. Game dialogues (narrative design)
+
+Add a **Game dialogue** tab with the **+** button in the tab bar (or *New dialogue tab* in the command palette). On a dialogue tab the palette shows only dialogue nodes and ready-made dialogue templates. A new tab starts with a small example conversation so you can see how the pieces fit together. The sample document also includes a *Dialogue: Merchant* tab.
+
+| Node | What it does |
+|---|---|
+| **Start** | The entry point of one conversation. The game starts the conversation with its **dialogue ID** (e.g. `weapon_shop`). A tab can hold several conversations. |
+| **Line** | A character says something: speaker, text, emotion/portrait, voice clip ID and tags. The header uses the character's colour. Write `{gold}` in the text to show a variable's value. |
+| **Player Choice** | The options the player picks from. Each connection that leaves the node is one option, and its number is shown on the connection. An option can have a **condition** (it is hidden when the condition is false) and can be **shown only once**. |
+| **Condition** | Branches on an expression such as `gold >= 50 and not metBefore`, with a green **True** output and a red **False** output. |
+| **Action / Variable** | Changes game state (`gold -= 50`, `hasSword = true`, `visits++`) or sends an event to the game (`@give_item steel_sword 1`). |
+| **Jump to Dialogue** | Continues with another conversation, which can be on another tab. |
+| **End** | Ends the conversation, with an optional result tag (e.g. `quest_accepted`). |
+
+Working with dialogues:
+
+- **Characters and variables** are listed in the properties panel when nothing is selected. Characters are shared by every dialogue tab in the document. Variables are the game state that conditions and actions use (true/false, number or text), each with a default value.
+- **Fast writing:** drag from the dot on a node's edge into empty space to create the next line. The app guesses the speaker by alternating between the two characters who are talking. In the panel, **Add next** adds a line, choice, condition, action or end after the selected node. If the node already has a next step, the button becomes **Insert after**: the new node goes in between and the nodes below move down to make room.
+- **Double-click** a line's text to write it, its header to change the speaker, or an option row of a choice to edit that option.
+- **Checks:** problems such as unconnected options, missing speakers, condition syntax errors, undeclared variables, unreachable nodes and duplicate IDs are marked with a badge on the node and listed in the panel. Click a problem to jump to the node.
+- **Play:** the **Play** button opens a preview that runs the dialogue the way the game would. While it runs you can change variables, pick options with the number keys, see locked options and why they are locked, and jump from any message back to its node on the canvas.
+
+**Exporting to the game:** **Export → Dialogue JSON…** creates the JSON your game reads, either for all dialogue tabs or only the current one. Each conversation lists its nodes, and the nodes point to each other by ID:
+
+```json
+{
+  "format": "umlstudio-dialogue", "version": 1, "project": "My RPG",
+  "characters": [{ "id": "merchant", "name": "Merchant", "color": "#3ecf8e" }],
+  "variables":  [{ "name": "gold", "type": "number", "defaultValue": "40" }],
+  "dialogues": [{
+    "id": "weapon_shop", "title": "Weapon merchant", "start": "n_1",
+    "nodes": [
+      { "id": "n_1", "type": "line", "speaker": "merchant", "text": "This sword costs 50 gold.", "emotion": "happy", "next": "n_2" },
+      { "id": "n_2", "type": "choice", "options": [
+          { "id": "n_2.o1", "text": "Buy it", "condition": "gold >= 50", "next": "n_3" },
+          { "id": "n_2.o2", "text": "Too expensive", "once": true, "next": "n_7" } ] },
+      { "id": "n_3", "type": "action", "actions": [
+          { "type": "set", "variable": "gold", "op": "-=", "value": "50" },
+          { "type": "event", "name": "give_item", "args": ["steel_sword", "1"] } ], "next": "n_4" },
+      { "id": "n_4", "type": "condition", "condition": "gold < 10", "ifTrue": "n_6", "ifFalse": "n_7" },
+      { "id": "n_6", "type": "jump", "dialogue": "beggar_quest" },
+      { "id": "n_7", "type": "end", "result": "bought_sword" }
+    ]
+  }]
+}
+```
+
+The schema is flat on purpose: every node uses the same field names and every value is a string, so any JSON parser can read it, including Unity's `JsonUtility`. The **Unity C# classes** button in the same dialog (or **Export → Dialogue C# data classes**) downloads `DialogueData.cs` with matching `[Serializable]` classes:
+
+```csharp
+DialogueDatabase db = JsonUtility.FromJson<DialogueDatabase>(jsonAsset.text);
+Dialogue d = db.FindDialogue("weapon_shop");
+DialogueNode node = d.Find(d.start);
+```
+
+The game then walks the nodes. For a `line`, show it and go to `next`. For a `choice`, show the options whose `condition` holds. For a `condition`, evaluate it and go to `ifTrue` or `ifFalse`. Apply the `actions` of an `action` node, switch to another dialogue on `jump`, and stop at `end` or when `next` is empty. Conditions use `== != < > <= >=`, `and or not` (or `&& || !`), numbers, `"strings"`, `true` / `false` and variable names.
+
+The dialogue design is saved with the rest of the document (`.uml.json`, autosave and Google Drive), so you keep editing it there. The exported JSON is the copy for the game.
+
 ---
 
 ## Member syntax
@@ -318,7 +379,9 @@ js/uml.js, model.js     UML metadata, member parser, document model, undo/redo s
 js/geometry.js          Shape sizes, connection points, line routing
 js/render.js            SVG rendering (also used for PNG/SVG export)
 js/layout.js            Automatic layered layout
-js/templates.js         Palette items: shapes, Unity classes, patterns, flows
+js/templates.js         Palette items: shapes, Unity classes, patterns, flows, dialogue templates
+js/dialogue.js          Game dialogues: node types, condition/action language, checks, JSON export, playtest runner
+js/dialogue-ui.js       Dialogue panels, playtest preview and JSON export dialog
 js/csharp.js            C# code generator and C# parser
 js/mermaid.js           Mermaid import/export, PlantUML export
 js/zip.js               Dependency-free ZIP writer
@@ -342,7 +405,7 @@ There are no dependencies and no build step: plain JavaScript loaded with `<scri
 node tests/run-tests.js
 ```
 
-The tests cover the member parser, translation coverage (every UI string has an English translation), C# import and export (including a round trip that regenerates code from every template and parses it again), Mermaid import and export, edge geometry for every template, auto-layout overlap checks, undo/redo, and the ZIP writer.
+The tests cover the member parser, translation coverage (every UI string has an English translation), C# import and export (including a round trip that regenerates code from every template and parses it again), Mermaid import and export, edge geometry for every template, auto-layout overlap checks, undo/redo, the ZIP writer, and the dialogue module (condition and action language, checks, JSON export links and the playtest runner).
 
 ---
 
@@ -361,6 +424,7 @@ All interface text goes through `$t('…')` in [`js/i18n.js`](js/i18n.js). The T
 - Only English and Turkish are included. Adding a language means adding a dictionary to `js/i18n.js` (see [Adding a language](#adding-a-language)).
 - The C# importer is a lightweight parser, not a compiler. It handles typical Unity code well, but unusual syntax may cause some members to be skipped.
 - PlantUML export supports class diagrams only. Use Mermaid for flowcharts.
+- Dialogue JSON is an export format for the game; the app does not import it back. Keep the `.uml.json` document as the editable source.
 - When several lines meet at the same corner of a decision shape, they can overlap. Reroute a line with its middle handle, or pin its start or end side in the properties panel.
 - Google sign-in inside an iOS home-screen app can be unreliable. If that happens, sign in once from Safari.
 - Real Google sign-in and real physical tablets were not part of the automated tests. Drive sync was tested against a simulated Drive API, and touch input was tested with emulated devices.

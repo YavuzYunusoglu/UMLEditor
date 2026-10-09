@@ -17,6 +17,14 @@
     note:        { label: $t('Not'), w: 180, h: 90, color: '#e6c34a' },
     text:        { label: $t('Metin'), w: 160, h: 40 },
     frame:       { label: $t('Grup / Paket'), w: 420, h: 300 },
+    // oyun diyalogları (yükseklik içerikten hesaplanır, bkz. dialogue.js)
+    dlgStart:    { label: $t('Başlangıç'), w: 220, h: 52, color: '#3ecf8e', dlg: true },
+    dlgLine:     { label: $t('Replik'), w: 260, h: 80, color: '#8e9bb0', dlg: true },
+    dlgChoice:   { label: $t('Oyuncu Seçimi'), w: 260, h: 100, color: '#4f8cff', dlg: true },
+    dlgBranch:   { label: $t('Koşul'), w: 220, h: 60, color: '#f5a623', dlg: true },
+    dlgAction:   { label: $t('Olay / Değişken'), w: 220, h: 60, color: '#b26bff', dlg: true },
+    dlgJump:     { label: $t('Diyaloğa Atla'), w: 200, h: 46, color: '#2bc0d6', dlg: true },
+    dlgEnd:      { label: $t('Bitiş'), w: 170, h: 38, color: '#ff6b6b', dlg: true },
   };
   const FLOW_TYPES = ['terminator', 'process', 'decision', 'io', 'preparation', 'subprocess', 'document', 'connector'];
 

@@ -57,6 +57,8 @@
     refresh: '<path d="M20 11a8 8 0 0 0-14.6-4.5L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.6 4.5L20 16"/><path d="M20 21v-5h-5"/>',
     select: '<path d="M4 4h3M10 4h4M17 4h3v3M20 10v4M20 17v3h-3M14 20h-4M7 20H4v-3M4 14v-4M4 7V4"/>',
     sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+    play: '<path d="M7 5v14l11-7z"/>',
+    chat: '<path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 9h8M8 12h5"/>',
     sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
   };
 
@@ -87,6 +89,14 @@
       case 'pattern': inner = `<rect x="3" y="4" width="11" height="9" rx="2" stroke="#4f8cff" fill="${U.rgba('#4f8cff', 0.2)}" stroke-width="1.5"/><rect x="18" y="4" width="11" height="9" rx="2" stroke="#3ecf8e" fill="${U.rgba('#3ecf8e', 0.2)}" stroke-width="1.5"/><rect x="10" y="20" width="12" height="9" rx="2" stroke="#b26bff" fill="${U.rgba('#b26bff', 0.2)}" stroke-width="1.5"/><path d="M14 8.5h4M16 13v7" stroke="currentColor" stroke-width="1.3"/>`; break;
       case 'loop': inner = `<path d="M16 4 26 11 16 18 6 11z" stroke="#f5a623" fill="${U.rgba('#f5a623', 0.2)}" stroke-width="1.5"/><path d="M6 11H3v15h13v-8" stroke="currentColor" fill="none" stroke-width="1.4"/><path d="m13 21 3-3 3 3" stroke="currentColor" fill="none" stroke-width="1.4"/>`; break;
       case 'flow': inner = `<rect x="8" y="2" width="16" height="7" rx="3.5" stroke="#3ecf8e" fill="${U.rgba('#3ecf8e', 0.2)}" stroke-width="1.4"/><path d="M16 12l6 5-6 5-6-5z" stroke="#f5a623" fill="${U.rgba('#f5a623', 0.2)}" stroke-width="1.4"/><rect x="9" y="25" width="14" height="6" rx="1" stroke="currentColor" fill="none" stroke-width="1.3"/><path d="M16 9v3M16 22v3" stroke="currentColor" stroke-width="1.3"/>`; break;
+      case 'dlgStart': inner = `<rect x="3" y="9" width="26" height="14" rx="7" ${st}/><path d="M11 12.5v7l6-3.5z" fill="${col}"/>`; break;
+      case 'dlgLine': inner = `<path d="M4 6h24v15H14l-6 5v-5H4z" ${st}/><path d="M9 11h14M9 15h9" stroke="${col}" stroke-width="1.4" stroke-linecap="round"/>`; break;
+      case 'dlgChoice': inner = `<rect x="4" y="5" width="24" height="22" rx="3" ${st}/><path d="M9 11h14M9 16h14M9 21h9" stroke="${col}" stroke-width="1.6" stroke-linecap="round"/>`; break;
+      case 'dlgBranch': inner = `<path d="M16 4 28 16 16 28 4 16z" ${st}/><path d="M12.5 16.5l2.5 2.5 4.5-5" stroke="${col}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`; break;
+      case 'dlgAction': inner = `<rect x="4" y="6" width="24" height="20" rx="3" ${st}/><path d="M17.5 9 12 17h4l-1.5 6 5.5-8h-4z" fill="${col}"/>`; break;
+      case 'dlgJump': inner = `<rect x="3" y="9" width="26" height="14" rx="7" ${st}/><path d="M10 19v-2.5a2.5 2.5 0 0 1 2.5-2.5H21M18.5 11.5 21 14l-2.5 2.5" stroke="${col}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; break;
+      case 'dlgEnd': inner = `<rect x="3" y="9" width="26" height="14" rx="7" ${st}/><rect x="12.5" y="13" width="7" height="6" rx="1.2" fill="${col}"/>`; break;
+      case 'dlgPattern': inner = `<path d="M3 4h17v10h-9l-4 3.5V14H3z" stroke="#f5a623" fill="${U.rgba('#f5a623', 0.2)}" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 17h17v10h-4v3.5L21 27h-9z" stroke="#4f8cff" fill="${U.rgba('#4f8cff', 0.2)}" stroke-width="1.4" stroke-linejoin="round"/>`; break;
       default: inner = `<rect x="4" y="8" width="24" height="16" rx="2" ${st}/>`;
     }
     return `<svg width="32" height="32" viewBox="0 0 32 32">${inner}</svg>`;

@@ -47,6 +47,7 @@
 
   function nodeSize(n) {
     if (n.type === 'class') { const l = classLayout(n); return { w: l.w, h: l.h }; }
+    if (App.Dialogue && App.Dialogue.isDlg(n)) { const l = App.Dialogue.layout(n); return { w: l.w, h: l.h }; }
     return { w: n.w, h: n.h };
   }
   function bounds(n) { const s = nodeSize(n); return { x: n.x, y: n.y, w: s.w, h: s.h }; }

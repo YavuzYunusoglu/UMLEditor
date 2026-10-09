@@ -44,7 +44,7 @@
   }
   function textArea(value, apply, opts) {
     opts = opts || {};
-    const el = h('textarea', { class: 'input area' + (opts.mono ? ' mono' : ''), value: value || '', rows: opts.rows || 4, placeholder: opts.placeholder || '', spellcheck: false, wrap: 'off' });
+    const el = h('textarea', { class: 'input area' + (opts.mono ? ' mono' : '') + (opts.wrap ? ' wrap' : ''), value: value || '', rows: opts.rows || 4, placeholder: opts.placeholder || '', spellcheck: !!opts.spellcheck, wrap: opts.wrap ? 'soft' : 'off' });
     return bindTx(el, apply);
   }
   function checkbox(label, value, apply) {
@@ -314,10 +314,11 @@
     const nodes = Store.selectedNodes();
     const edges = Store.selectedEdges();
     let content;
-    if (nodes.length === 1 && !edges.length) content = nodes[0].type === 'class' ? renderClass(nodes[0]) : renderShape(nodes[0]);
-    else if (edges.length === 1 && !nodes.length) content = renderEdge(edges[0]);
+    const D = App.Dialogue, DUI = App.DialogueUI;
+    if (nodes.length === 1 && !edges.length) content = D.isDlg(nodes[0]) ? DUI.renderNode(nodes[0]) : nodes[0].type === 'class' ? renderClass(nodes[0]) : renderShape(nodes[0]);
+    else if (edges.length === 1 && !nodes.length) content = DUI.isDlgEdge(edges[0]) ? DUI.renderEdge(edges[0]) : renderEdge(edges[0]);
     else if (nodes.length + edges.length > 1) content = renderMulti(nodes, edges);
-    else content = renderDocument();
+    else content = D.isDialogueTab(Store.tab) ? DUI.renderTab() : renderDocument();
     root.replaceChildren(...content);
     root.scrollTop = scroll;
   }
@@ -330,5 +331,5 @@
     Store.on('change', () => { if (!root.contains(document.activeElement)) render(); });
   }
 
-  App.Panel = { init, render };
+  App.Panel = { init, render, kit: { section, field, textInput, numInput, textArea, checkbox, select, segmented, colorRow, btn, iconBtn, rich, stat, nodeActions, bindTx } };
 })(window);

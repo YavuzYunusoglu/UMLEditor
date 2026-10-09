@@ -22,8 +22,23 @@
     save: (as) => IO.save(as),
 
     addTab(name, kind) {
+      if (kind === 'dialogue') return Actions.addDialogueTab(name);
       const t = Model.newTab(name || uniqueTabName(kind === 'flow' ? $t('Akış Şeması') : kind === 'class' ? $t('Sınıf Diyagramı') : $t('Diyagram')));
       Store.mutate(() => { Store.doc.tabs.push(t); });
+      Store.setActiveTab(t.id);
+      return t;
+    },
+    /* Yeni diyalog sekmesi: nasıl çalıştığı görülsün diye küçük bir örnekle başlar */
+    addDialogueTab(name, templateId) {
+      const t = Model.newTab(name || uniqueTabName($t('Diyalog')), 'dialogue');
+      const frag = App.Templates.byId(templateId || 'dlgGreeting').build();
+      App.Dialogue.prepareInsert(Store.doc, frag);
+      App.Layout.layered(frag.nodes, frag.edges, {});
+      Store.mutate(() => {
+        Store.insertFragment(frag, t);
+        App.Dialogue.mergeRegistry(Store.doc, frag);
+        Store.doc.tabs.push(t);
+      });
       Store.setActiveTab(t.id);
       return t;
     },
@@ -181,6 +196,7 @@
             t.name = uniqueTabName(t.name);
             Store.doc.tabs.push(t);
           }
+          App.Dialogue.mergeRegistry(Store.doc, App.Dialogue.reg(doc));
         });
         Store.setActiveTab(doc.tabs[0].id);
         Editor.fitView();
@@ -375,6 +391,12 @@
       { label: $t('JSON belgesini aç…'), icon: 'folder', shortcut: 'Ctrl+O', action: Actions.open },
     ]);
     UI.dropdown($('btnExport'), () => [
+      ...(Store.doc.tabs.some(App.Dialogue.isDialogueTab) ? [
+        { header: $t('Oyun diyaloğu') },
+        { label: $t('Diyalog JSON…'), icon: 'chat', action: () => App.DialogueUI.exportDialog() },
+        { label: $t('Diyalog C# veri sınıfları'), icon: 'code', action: () => U.download('DialogueData.cs', '\uFEFF' + App.Dialogue.csharpModel(), 'text/plain') },
+        { sep: true },
+      ] : []),
       { header: $t('Görsel') },
       { label: $t('PNG resim…'), icon: 'image', action: () => Actions.exportImageDialog('png') },
       { label: $t('SVG vektör…'), icon: 'image', action: () => Actions.exportImageDialog('svg') },
@@ -482,19 +504,24 @@
   let collapsed = {};
   try { collapsed = JSON.parse(localStorage.getItem('umlstudio.palette') || '{}'); } catch (e) { collapsed = {}; }
 
+  /* Diyalog sekmesinde yalnızca diyalog bölümleri, diğer sekmelerde yalnızca UML / akış bölümleri */
+  function sectionVisible(sec) { return !!sec.dlg === App.Dialogue.isDialogueTab(Store.tab); }
+  let renderPalette = () => {};
+
   function buildPalette() {
     const body = document.getElementById('paletteBody');
     const search = document.getElementById('paletteSearch');
-    const render = () => {
+    const render = renderPalette = () => {
       const q = norm(search.value.trim());
       body.replaceChildren();
       for (const sec of App.Templates.SECTIONS) {
+        if (!sectionVisible(sec)) continue;
         const items = App.Templates.items.filter((i) => i.section === sec.id && (!q || q.split(/\s+/).every((w) => norm(i.label + ' ' + sec.label + ' ' + (i.alt || '')).includes(w))));
         if (!items.length) continue;
         const isCol = !q && collapsed[sec.id];
         const head = h('button', { class: 'pal-head' + (isCol ? ' collapsed' : ''), html: icon('chevron', 14) + `<span>${U.esc(sec.label)}</span><em>${items.length}</em>` });
         head.addEventListener('click', () => { collapsed[sec.id] = !collapsed[sec.id]; try { localStorage.setItem('umlstudio.palette', JSON.stringify(collapsed)); } catch (e) { /* yok say */ } render(); });
-        const grid = h('div', { class: 'pal-grid' + (sec.id === 'uml' || sec.id === 'flow' ? '' : ' list') });
+        const grid = h('div', { class: 'pal-grid' + (sec.id === 'uml' || sec.id === 'flow' || sec.id === 'dialogue' ? '' : ' list') });
         for (const it of items) {
           const el = h('div', { class: 'pal-item', draggable: 'true', title: $t('{label} — tıkla veya sürükle', { label: it.label }), tabindex: 0 },
             h('span', { class: 'pal-ico', html: UI.paletteIcon(it) }), h('span', { class: 'pal-label' }, it.label));
@@ -520,9 +547,10 @@
     const bar = document.getElementById('tabList');
     bar.replaceChildren();
     for (const t of Store.doc.tabs) {
-      const isFlow = t.nodes.length && t.nodes.filter((n) => n.type !== 'class').length > t.nodes.length / 2;
+      const isDlgTab = App.Dialogue.isDialogueTab(t);
+      const isFlow = !isDlgTab && t.nodes.length && t.nodes.filter((n) => n.type !== 'class').length > t.nodes.length / 2;
       const el = h('div', { class: 'tab' + (t.id === Store.doc.activeTab ? ' active' : ''), title: $t('{name} — çift tıkla: yeniden adlandır', { name: t.name }) },
-        h('span', { class: 'tab-dot' + (isFlow ? ' flow' : '') }),
+        h('span', { class: 'tab-dot' + (isDlgTab ? ' dlg' : isFlow ? ' flow' : '') }),
         h('span', { class: 'tab-name' }, t.name),
         h('button', { class: 'tab-close', title: $t('Sekmeyi kapat'), html: icon('x', 12), onclick: (e) => { e.stopPropagation(); Actions.closeTab(t.id); } }));
       el.addEventListener('pointerdown', (e) => { if (e.button === 0) Store.setActiveTab(t.id); if (e.button === 1) { e.preventDefault(); Actions.closeTab(t.id); } });
@@ -566,14 +594,20 @@
 
   /* ======================= KOMUT PALETİ ======================= */
   function commandItems(at) {
-    const items = App.Templates.items.map((it) => ({
+    const items = App.Templates.items.filter((it) => sectionVisible(App.Templates.SECTIONS.find((s) => s.id === it.section))).map((it) => ({
       label: it.label, group: App.Templates.SECTIONS.find((s) => s.id === it.section).label, ico: UI.paletteIcon(it), alt: it.alt || '',
       run: () => Editor.insertItem(it, at),
     }));
     const group = $t('Komut');
     const act = (label, ic, run, kbd) => ({ label, group, ico: icon(ic, 18), run, kbd });
+    if (App.Dialogue.isDialogueTab(Store.tab)) {
+      items.unshift(
+        act($t('Diyaloğu oynat'), 'play', () => App.DialogueUI.playtest(Store.sel.nodes.size === 1 ? [...Store.sel.nodes][0] : null)),
+        act($t('Diyalog JSON dışa aktar'), 'chat', () => App.DialogueUI.exportDialog()));
+    }
     items.push(
       act($t('Yeni sekme'), 'plus', () => Actions.addTab()),
+      act($t('Yeni diyalog sekmesi'), 'chat', () => Actions.addDialogueTab()),
       act($t('PNG olarak dışa aktar'), 'image', () => Actions.exportImageDialog('png')),
       act($t('SVG olarak dışa aktar'), 'image', () => Actions.exportImageDialog('svg')),
       act($t('C# script\'leri dışa aktar (.zip)'), 'code', () => IO.exportCSharpZip()),
@@ -651,6 +685,11 @@
           items.push({ label: $t('Unity metodu ekle'), icon: 'unity', submenu: App.Templates.UNITY_METHODS.map((g) => ({ label: g.group, submenu: g.items.map((m) => ({ label: m, action: () => Store.mutate(() => { n.methods = (n.methods ? n.methods + '\n' : '') + m; }) })) })) });
         }
       }
+      if (sel.length === 1 && App.Dialogue.isDlg(n)) {
+        items.push({ sep: true }, { label: $t('Buradan oynat'), icon: 'play', action: () => App.DialogueUI.playtest(n.id) });
+        if (n.type === 'dlgLine') items.push({ label: $t('Konuşmacı'), submenu: App.Dialogue.reg(Store.doc).characters.map((c) => ({ label: c.name, checked: n.speaker === c.id, action: () => Store.mutate(() => { n.speaker = c.id; }) })).concat([{ label: $t('(konuşmacı yok)'), checked: !n.speaker, action: () => Store.mutate(() => { n.speaker = ''; }) }]) });
+        if (n.type === 'dlgChoice') items.push({ label: $t('Seçenek ekle'), icon: 'plus', action: () => App.DialogueUI.addOption(n) });
+      }
       if (sel.length === 1 && App.UML.FLOW_TYPES.includes(n.type)) {
         items.push({ sep: true }, { label: $t('Şekli değiştir'), submenu: App.UML.FLOW_TYPES.map((t) => ({ label: App.UML.SHAPES[t].label, checked: n.type === t, action: () => Store.mutate(() => { n.type = t; if (t === 'connector') n.w = n.h = 40; }) })) });
       }
@@ -675,6 +714,7 @@
       }
     } else {
       items.push(
+        App.Dialogue.isDialogueTab(Store.tab) ? { label: $t('Diyaloğu oynat'), icon: 'play', action: () => App.DialogueUI.playtest() } : null,
         { label: $t('Hızlı ekle…'), icon: 'plus', shortcut: 'Ctrl+K', action: () => openCommandPalette(p) },
         { label: $t('Yapıştır'), icon: 'copy', shortcut: 'Ctrl+V', action: () => Editor.paste(p) },
         { label: $t('Tümünü seç'), shortcut: 'Ctrl+A', action: Editor.selectAll },
@@ -795,6 +835,14 @@ public class Enemy : MonoBehaviour, IDamageable {
       return t;
     };
     doc.tabs.push(fromTemplate($t('Yaşam Döngüsü'), 'lifecycle'), fromTemplate($t('for Döngüsü'), 'for'));
+
+    // oyun diyaloğu örneği
+    const dt = Model.newTab($t('Diyalog: Tüccar'), 'dialogue');
+    const dfrag = App.Templates.byId('dlgShop').build();
+    App.Layout.layered(dfrag.nodes, dfrag.edges, {});
+    Store.insertFragment(dfrag, dt);
+    App.Dialogue.mergeRegistry(doc, dfrag);
+    doc.tabs.push(dt);
     return doc;
   }
 
@@ -826,6 +874,12 @@ public class Enemy : MonoBehaviour, IDamageable {
     Store.on('saved', () => { updateTitle(); autosave(); });
     Store.on('docName', () => { updateTitle(); autosave(); });
     Store.on('tabsChanged', renderTabs);
+    // sekme türü değişince palet bölümleri değişir
+    let palKind = null;
+    const syncPalette = () => { const k = App.Dialogue.isDialogueTab(Store.tab); if (k !== palKind) { palKind = k; renderPalette(); } };
+    Store.on('tab', syncPalette);
+    Store.on('load', syncPalette);
+    Store.on('change', syncPalette);
     Store.on('theme', () => { App.Panel.render(); });
 
     window.addEventListener('keydown', onKey);
@@ -834,6 +888,7 @@ public class Enemy : MonoBehaviour, IDamageable {
       UI.showMenu(r.left, r.bottom + 4, [
         { label: $t('Sınıf diyagramı'), icon: 'unity', action: () => Actions.addTab(null, 'class') },
         { label: $t('Akış şeması'), icon: 'layout', action: () => Actions.addTab(null, 'flow') },
+        { label: $t('Oyun diyaloğu'), icon: 'chat', action: () => Actions.addTab(null, 'dialogue') },
       ]);
     });
     window.addEventListener('beforeunload', () => autosave.flush());

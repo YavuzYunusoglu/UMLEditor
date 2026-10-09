@@ -2,7 +2,7 @@
 
 **English:** [README.md](README.md)
 
-Tarayıcıda çalışan, ücretsiz ve çevrimdışı kullanılabilen bir **UML sınıf diyagramı ve akış şeması editörü**. **Unity kısayolları** ile **C# içe/dışa aktarma** desteği var. Kurulum gerektirmez; bilgisayarda, tablette ve telefonda çalışır. İsteğe bağlı **Google Drive** senkronu sayesinde bir cihazda başladığınız diyagrama başka bir cihazda devam edebilirsiniz.
+Tarayıcıda çalışan, ücretsiz ve çevrimdışı kullanılabilen bir **UML sınıf diyagramı ve akış şeması editörü**. **Unity kısayolları** ile **C# içe/dışa aktarma** desteği var. Anlatı tasarımcıları için oynatarak deneme ve oyuna JSON aktarma özellikli bir **oyun diyaloğu editörü** de içerir. Kurulum gerektirmez; bilgisayarda, tablette ve telefonda çalışır. İsteğe bağlı **Google Drive** senkronu sayesinde bir cihazda başladığınız diyagrama başka bir cihazda devam edebilirsiniz.
 
 > [!IMPORTANT]
 > **Bu proje yapay zeka ile oluşturulmuştur.**
@@ -31,6 +31,7 @@ Tarayıcıda çalışan, ücretsiz ve çevrimdışı kullanılabilen bir **UML s
   - [Google Drive senkronu](#8-google-drive-senkronu)
   - [Tablet ve telefon](#9-tablet-ve-telefon)
   - [Komut paleti ve klavye kısayolları](#10-komut-paleti-ve-klavye-kısayolları)
+  - [Oyun diyalogları (anlatı tasarımı)](#11-oyun-diyalogları-anlatı-tasarımı)
 - [Üye yazımı](#üye-yazımı)
 - [GitHub Pages ile yayınlama](#github-pages-ile-yayınlama)
 - [Google Drive kurulumu](#google-drive-kurulumu-bir-kerelik-5-dakika)
@@ -49,6 +50,7 @@ Tarayıcıda çalışan, ücretsiz ve çevrimdışı kullanılabilen bir **UML s
 |---|---|
 | **Sınıf diyagramları** | Sınıf, soyut sınıf, arayüz, enum, struct, not ve paket/grup. Çokluk etiketleriyle birlikte yedi ilişki türü: association, inheritance, realization, dependency, aggregation, composition ve link. |
 | **Akış şemaları** | Başla/bitir, işlem, karar, girdi/çıktı, döngü (hazırlık), alt süreç, doküman, bağlayıcı ve serbest metin. |
+| **Oyun diyalogları** | Anlatı tasarımcıları için düğüm editörü: replikler, oyuncu seçimleri, koşullar, olaylar/değişkenler ve diyaloglar arası atlama; ortak karakter ve değişken listesi. Sorunlar anında denetlenir, önizleme diyaloğu oyundaki gibi oynatır ve **Diyalog JSON** dışa aktarımıyla birlikte uyumlu Unity C# veri sınıfları gelir. |
 | **Unity kısayolları** | Tek tıkla MonoBehaviour, ScriptableObject, Singleton, `[Serializable]`, Custom Editor, EditorWindow, StateMachineBehaviour ve dahası. Hazır **tasarım desenleri**, **döngü/akış şablonları** ve **Unity mesajları ile alanları** için menüler de var. |
 | **C# dışa aktarma** | Unity'ye hazır `.cs` dosyaları tek bir `.zip` içinde. `[SerializeField]`, `[CreateAssetMenu]`, `[CustomEditor]`, singleton iskeleti ve arayüz metotları otomatik eklenir; editor script'leri `Editor/` klasörüne konur. |
 | **C# içe aktarma** | `.cs` dosyalarını ya da tüm `Assets/Scripts` klasörünü bırakın, sınıf diyagramı oluşsun. Alanlar, özellikler, metotlar, kalıtım ve referanslar otomatik algılanır. |
@@ -226,6 +228,65 @@ Tüm şekilleri, Unity şablonlarını ve komutları aramak için `Ctrl+K` (ya d
 
 Çerçeveyle seçim çoğu CAD programındaki gibi çalışır: sağa doğru sürüklerseniz çerçevenin **tamamen içinde kalan** şekiller, sola doğru sürüklerseniz çerçevenin **değdiği** şekiller seçilir.
 
+### 11. Oyun diyalogları (anlatı tasarımı)
+
+Sekme çubuğundaki **+** düğmesinden **Oyun diyaloğu** sekmesi ekleyin (ya da komut paletinde *Yeni diyalog sekmesi*). Diyalog sekmesinde palet yalnızca diyalog düğümlerini ve hazır diyalog şablonlarını gösterir. Parçaların nasıl birleştiğini görebilmeniz için yeni sekme küçük bir örnek konuşmayla açılır. Örnek belgede de bir *Diyalog: Tüccar* sekmesi vardır.
+
+| Düğüm | Ne işe yarar |
+|---|---|
+| **Başlangıç** | Bir konuşmanın giriş noktası. Oyun konuşmayı bu düğümün **diyalog kimliğiyle** (ör. `weapon_shop`) başlatır. Bir sekmede birden fazla konuşma olabilir. |
+| **Replik** | Bir karakterin söylediği söz: konuşmacı, metin, duygu/portre, ses kaydı kimliği ve etiketler. Başlık karakterin rengini alır. Metne `{gold}` yazarsanız değişkenin değeri gösterilir. |
+| **Oyuncu Seçimi** | Oyuncunun seçeceği seçenekler. Düğümden çıkan her bağlantı bir seçenektir ve numarası bağlantının üzerinde görünür. Bir seçeneğe **koşul** eklenebilir (koşul sağlanmazsa seçenek gizlenir) ve seçenek **yalnızca bir kez** gösterilebilir. |
+| **Koşul** | `gold >= 50 and not metBefore` gibi bir ifadeye göre dallanır. Yeşil **Doğru** ve kırmızı **Yanlış** olmak üzere iki çıkışı vardır. |
+| **Olay / Değişken** | Oyun durumunu değiştirir (`gold -= 50`, `hasSword = true`, `visits++`) ya da oyuna olay gönderir (`@give_item steel_sword 1`). |
+| **Diyaloğa Atla** | Başka bir konuşmayla devam eder; o konuşma başka bir sekmede olabilir. |
+| **Bitiş** | Konuşmayı bitirir. İsteğe bağlı bir sonuç etiketi verilebilir (ör. `quest_accepted`). |
+
+Diyaloglarla çalışma:
+
+- **Karakterler ve değişkenler**, hiçbir şey seçili değilken özellikler panelinde listelenir. Karakterler belgedeki tüm diyalog sekmelerinde ortaktır. Değişkenler, koşulların ve eylemlerin kullandığı oyun durumudur (doğru/yanlış, sayı ya da metin) ve her birinin varsayılan değeri vardır.
+- **Hızlı yazma:** bir düğümün kenarındaki noktadan boşluğa sürüklerseniz sıradaki replik oluşur. Uygulama konuşmacıyı, konuşan iki karakter arasında sırayla geçerek tahmin eder. Paneldeki **Ardına ekle** düğmeleri seçili düğümün ardına replik, seçim, koşul, olay ya da bitiş ekler. Düğümün zaten bir sonraki adımı varsa düğme **Araya ekle** olur: yeni düğüm araya girer ve aşağıdaki düğümler yer açmak için kayar.
+- Replik metnine **çift tıklayarak** yazın, başlığına çift tıklayarak konuşmacıyı değiştirin, seçim düğümündeki bir seçenek satırına çift tıklayarak o seçeneği düzenleyin.
+- **Kontrol:** bağlanmamış seçenekler, eksik konuşmacılar, koşul yazım hataları, tanımsız değişkenler, ulaşılamayan düğümler ve aynı kimliği kullanan başlangıçlar gibi sorunlar düğümün üzerinde bir işaretle gösterilir ve panelde listelenir. Bir soruna tıklayınca o düğüme gidilir.
+- **Oynat:** **Oynat** düğmesi diyaloğu oyundaki gibi çalıştıran bir önizleme açar. Önizleme sırasında değişkenleri değiştirebilir, seçenekleri rakam tuşlarıyla seçebilir, kilitli seçenekleri ve neden kilitli olduklarını görebilir, her mesajdan tuvaldeki düğümüne gidebilirsiniz.
+
+**Oyuna aktarma:** **Dışa Aktar → Diyalog JSON…** oyununuzun okuyacağı JSON'u tüm diyalog sekmeleri ya da yalnızca bu sekme için üretir. Her konuşma kendi düğümlerini listeler ve düğümler birbirine kimlikleriyle bağlanır:
+
+```json
+{
+  "format": "umlstudio-dialogue", "version": 1, "project": "My RPG",
+  "characters": [{ "id": "merchant", "name": "Tüccar", "color": "#3ecf8e" }],
+  "variables":  [{ "name": "gold", "type": "number", "defaultValue": "40" }],
+  "dialogues": [{
+    "id": "weapon_shop", "title": "Silah tüccarı", "start": "n_1",
+    "nodes": [
+      { "id": "n_1", "type": "line", "speaker": "merchant", "text": "Bu kılıç 50 altın.", "emotion": "happy", "next": "n_2" },
+      { "id": "n_2", "type": "choice", "options": [
+          { "id": "n_2.o1", "text": "Satın al", "condition": "gold >= 50", "next": "n_3" },
+          { "id": "n_2.o2", "text": "Çok pahalı", "once": true, "next": "n_7" } ] },
+      { "id": "n_3", "type": "action", "actions": [
+          { "type": "set", "variable": "gold", "op": "-=", "value": "50" },
+          { "type": "event", "name": "give_item", "args": ["steel_sword", "1"] } ], "next": "n_4" },
+      { "id": "n_4", "type": "condition", "condition": "gold < 10", "ifTrue": "n_6", "ifFalse": "n_7" },
+      { "id": "n_6", "type": "jump", "dialogue": "beggar_quest" },
+      { "id": "n_7", "type": "end", "result": "bought_sword" }
+    ]
+  }]
+}
+```
+
+Şema bilerek düz tutuldu: tüm düğümler aynı alan adlarını kullanır ve tüm değerler metindir. Böylece Unity'nin `JsonUtility`'si dahil her JSON ayrıştırıcısı dosyayı okuyabilir. Aynı penceredeki **Unity C# sınıfları** düğmesi (ya da **Dışa Aktar → Diyalog C# veri sınıfları**) bu şemaya uyan `[Serializable]` sınıfları içeren `DialogueData.cs` dosyasını indirir:
+
+```csharp
+DialogueDatabase db = JsonUtility.FromJson<DialogueDatabase>(jsonAsset.text);
+Dialogue d = db.FindDialogue("weapon_shop");
+DialogueNode node = d.Find(d.start);
+```
+
+Oyun bundan sonra düğümleri sırayla izler. `line` düğümünü gösterip `next` değerine geçer. `choice` düğümünde `condition` değeri sağlanan seçenekleri gösterir. `condition` düğümünde ifadeyi değerlendirip `ifTrue` ya da `ifFalse` değerine gider. `action` düğümünün eylemlerini uygular, `jump` düğümünde başka diyaloğa geçer ve `end` düğümünde ya da `next` boş olduğunda durur. Koşullarda `== != < > <= >=`, `and or not` (ya da `&& || !`), sayılar, `"metinler"`, `true` / `false` ve değişken adları kullanılır.
+
+Diyalog tasarımı belgenin geri kalanıyla birlikte kaydedilir (`.uml.json`, otomatik kayıt ve Google Drive); düzenlemeye orada devam edersiniz. Dışa aktarılan JSON oyun için hazırlanan kopyadır.
+
 ---
 
 ## Üye yazımı
@@ -318,7 +379,9 @@ js/uml.js, model.js     UML meta verisi, üye ayrıştırıcı, belge modeli, ge
 js/geometry.js          Şekil boyutları, bağlantı noktaları, çizgi rotaları
 js/render.js            SVG çizimi (PNG/SVG dışa aktarmada da kullanılır)
 js/layout.js            Otomatik katmanlı yerleşim
-js/templates.js         Palet öğeleri: şekiller, Unity sınıfları, desenler, akışlar
+js/templates.js         Palet öğeleri: şekiller, Unity sınıfları, desenler, akışlar, diyalog şablonları
+js/dialogue.js          Oyun diyalogları: düğüm türleri, koşul/eylem dili, kontroller, JSON dışa aktarım, önizleme oynatıcısı
+js/dialogue-ui.js       Diyalog panelleri, önizleme ve JSON dışa aktarım penceresi
 js/csharp.js            C# kod üretici ve C# ayrıştırıcı
 js/mermaid.js           Mermaid içe/dışa aktarma, PlantUML dışa aktarma
 js/zip.js               Bağımlılıksız ZIP yazıcı
@@ -342,7 +405,7 @@ Bağımlılık ve derleme adımı yoktur: `<script>` etiketleriyle yüklenen dü
 node tests/run-tests.js
 ```
 
-Testler şunları kapsar: üye ayrıştırıcı, çeviri kapsamı (her arayüz metninin İngilizce karşılığı var mı), C# içe ve dışa aktarma (her şablondan kod üretip tekrar ayrıştıran gidiş-dönüş testi dahil), Mermaid içe ve dışa aktarma, her şablon için çizgi geometrisi, otomatik yerleşimde çakışma kontrolü, geri al/yinele ve ZIP yazıcı.
+Testler şunları kapsar: üye ayrıştırıcı, çeviri kapsamı (her arayüz metninin İngilizce karşılığı var mı), C# içe ve dışa aktarma (her şablondan kod üretip tekrar ayrıştıran gidiş-dönüş testi dahil), Mermaid içe ve dışa aktarma, her şablon için çizgi geometrisi, otomatik yerleşimde çakışma kontrolü, geri al/yinele, ZIP yazıcı ve diyalog modülü (koşul ve eylem dili, kontroller, JSON dışa aktarımdaki bağlantılar ve önizleme oynatıcısı).
 
 ---
 
@@ -361,6 +424,7 @@ Arayüzdeki tüm metinler [`js/i18n.js`](js/i18n.js) içindeki `$t('…')` fonks
 - Yalnızca Türkçe ve İngilizce var. Yeni dil eklemek `js/i18n.js` dosyasına bir sözlük eklemek demektir (bkz. [Yeni dil ekleme](#yeni-dil-ekleme)).
 - C# içe aktarıcı bir derleyici değil, hafif bir ayrıştırıcıdır. Tipik Unity kodunu iyi okur, ama alışılmadık sözdiziminde bazı üyeleri atlayabilir.
 - PlantUML dışa aktarma yalnızca sınıf diyagramlarını destekler. Akış şemaları için Mermaid kullanın.
+- Diyalog JSON'u oyun için bir dışa aktarma biçimidir; uygulama onu geri içe aktarmaz. Düzenlenebilir kaynak olarak `.uml.json` belgesini saklayın.
 - Bir karar şeklinin aynı köşesinde birden fazla çizgi buluşursa üst üste binebilir. Çizginin ortadaki tutamacıyla rotasını değiştirin ya da özellikler panelinden çıkış/giriş kenarını sabitleyin.
 - iOS'ta ana ekrana eklenmiş uygulamada Google girişi bazen sorun çıkarabilir. Öyle olursa girişi bir kez Safari'den yapın.
 - Gerçek Google girişi ve fiziksel tabletler otomatik testlere dahil değildir. Drive senkronu taklit edilmiş bir Drive API ile, dokunmatik kullanım ise emüle edilmiş cihazlarla test edildi.

@@ -118,8 +118,9 @@
     return s + '</g>';
   }
 
-  function renderNode(n, T, live) {
+  function renderNode(n, T, live, dctx) {
     if (n.type === 'class') return renderClass(n, T);
+    if (App.Dialogue && App.Dialogue.isDlg(n)) return App.Dialogue.render(n, T, live, dctx);
     if (n.type === 'frame') return renderFrame(n, T, live);
     return renderFlow(n, T);
   }
@@ -189,16 +190,22 @@
     const live = !!opts.live;
     const selE = opts.selectedEdges || new Set();
     const geom = Geo.computeEdges(tab, only ? { only: (e) => only.has(e.from) && only.has(e.to) } : null);
+    const D = App.Dialogue;
+    const dctx = D ? D.renderContext(tab, live) : null;
+    const nodeMap = dctx ? new Map(tab.nodes.map((n) => [n.id, n])) : null;
     let frames = '', nodes = '', edges = '', labels = '';
     for (const n of tab.nodes) {
       if (only && !only.has(n.id)) continue;
       if (n.type === 'frame') frames += renderNode(n, T, live);
-      else nodes += renderNode(n, T, live);
+      else nodes += renderNode(n, T, live, dctx);
     }
-    for (const e of tab.edges) {
+    for (let e of tab.edges) {
       const g = geom.get(e.id);
       if (!g) continue;
       const sel = selE.has(e.id);
+      // diyalogda seçenek numarası / Doğru-Yanlış etiketi kenardan değil kaynak düğümden gelir
+      const dd = dctx && D.edgeDecor(e, nodeMap.get(e.from));
+      if (dd) e = Object.assign({}, e, { label: dd.label, color: e.color || dd.color });
       edges += renderEdge(e, g, T, sel, live);
       labels += renderEdgeLabels(e, g, T, sel);
     }

@@ -4,6 +4,7 @@
   const App = (global.App = global.App || {});
   const $t = App.$t || ((k) => k);
   const SH = App.UML.SHAPES;
+  const U = App.U;
 
   /* ---- Yardımcılar ---- */
   function cls(id, x, y, props) {
@@ -316,12 +317,103 @@
     edges: [['s', 'c'], ['c', 'r', YES], ['c', 'e', NO, 'right', 'right'], ['r', 'h'], ['h', 'fx', YES], ['h', 'cd', NO, 'right', 'top'], ['fx', 'cd', '', 'right', 'left'], ['cd', 'e']],
   }), { icon: 'flow' });
 
+  /* ---------------- Oyun diyalogları ---------------- */
+  /* Diyalog parçacığı: düğümler [id, tür, özellikler], kenarlar [kaynak, hedef, seçenek id | 'true' | 'false'].
+     Birden fazla düğüm varsa eklenirken otomatik yerleşir. */
+  function dlg(spec) {
+    return () => {
+      const nodes = spec.nodes.map(([id, type, props]) => Object.assign({ id, type, x: 0, y: 0, w: SH[type].w, h: SH[type].h }, App.Dialogue.defaults(type), U.clone(props || {})));
+      const edges = (spec.edges || []).map(([from, to, port], i) => {
+        const e = { id: 'e' + i, from, to, type: 'flow', label: '' };
+        if (port === 'true' || port === 'false') e.branch = port;
+        else if (port) e.opt = port;
+        return e;
+      });
+      return { nodes, edges, layout: nodes.length > 1, characters: U.clone(spec.characters || []), variables: U.clone(spec.variables || []) };
+    };
+  }
+  const opt = (id, text, cond, once) => Object.assign({ id, text, cond: cond || '' }, once ? { once: true } : {});
+
+  add('dialogue', 'dlgStart', $t('Başlangıç'), dlg({ nodes: [['a', 'dlgStart', { text: $t('Yeni diyalog'), dlgId: 'new_dialogue' }]] }), { icon: 'dlgStart', alt: 'start entry' });
+  add('dialogue', 'dlgLine', $t('Replik'), dlg({ nodes: [['a', 'dlgLine', { text: $t('Merhaba yolcu!') }]] }), { icon: 'dlgLine', alt: 'line npc speech' });
+  add('dialogue', 'dlgChoice', $t('Oyuncu Seçimi'), dlg({ nodes: [['a', 'dlgChoice', { options: [opt('o1', $t('Evet')), opt('o2', $t('Hayır'))] }]] }), { icon: 'dlgChoice', alt: 'choice option player' });
+  add('dialogue', 'dlgBranch', $t('Koşul'), dlg({ nodes: [['a', 'dlgBranch', { cond: 'gold >= 50' }]] }), { icon: 'dlgBranch', alt: 'condition if branch' });
+  add('dialogue', 'dlgAction', $t('Olay / Değişken'), dlg({ nodes: [['a', 'dlgAction', { actions: 'gold -= 50\n@give_item sword' }]] }), { icon: 'dlgAction', alt: 'action event set variable' });
+  add('dialogue', 'dlgJump', $t('Diyaloğa Atla'), dlg({ nodes: [['a', 'dlgJump', { target: '' }]] }), { icon: 'dlgJump', alt: 'jump goto' });
+  add('dialogue', 'dlgEnd', $t('Bitiş'), dlg({ nodes: [['a', 'dlgEnd', { text: '' }]] }), { icon: 'dlgEnd', alt: 'end exit' });
+  add('dialogue', 'dlgNote', $t('Not'), shape('note', { text: $t('Tasarım notu…') }), { icon: 'note' });
+  add('dialogue', 'dlgFrame', $t('Grup / Sahne'), shape('frame', { text: $t('Sahne') }), { icon: 'frame' });
+
+  const GUARD = { id: 'guard', name: $t('Muhafız'), color: '#f5a623' };
+  add('dlgpatterns', 'dlgGreeting', $t('Selamlama ve sorular'), dlg({
+    characters: [GUARD],
+    nodes: [
+      ['s', 'dlgStart', { text: $t('Kapı muhafızı'), dlgId: 'gate_guard' }],
+      ['l1', 'dlgLine', { speaker: 'guard', text: $t('Dur! Şehre girmek isteyen herkes buradan geçer.') }],
+      ['c', 'dlgChoice', { options: [opt('o1', $t('Sen kimsin?')), opt('o2', $t('Şehirde neler oluyor?'), '', true), opt('o3', $t('Geçmeme izin ver.'))] }],
+      ['r1', 'dlgLine', { speaker: 'guard', text: $t('Kralın muhafızıyım. Yirmi yıldır bu kapıyı bekliyorum.') }],
+      ['r2', 'dlgLine', { speaker: 'guard', text: $t('Kuzeyde kurt sürüleri görülmüş. Dikkatli ol.'), emotion: 'worried' }],
+      ['r3', 'dlgLine', { speaker: 'guard', text: $t('Peki. Başını belaya sokma.') }],
+      ['e', 'dlgEnd', { text: 'passed_gate' }],
+    ],
+    edges: [['s', 'l1'], ['l1', 'c'], ['c', 'r1', 'o1'], ['c', 'r2', 'o2'], ['c', 'r3', 'o3'], ['r1', 'c'], ['r2', 'c'], ['r3', 'e']],
+  }), { icon: 'dlgPattern', alt: 'greeting questions loop' });
+  add('dlgpatterns', 'dlgShop', $t('Tüccar: altın kontrolü'), dlg({
+    characters: [{ id: 'merchant', name: $t('Tüccar'), color: '#3ecf8e' }],
+    variables: [{ name: 'gold', type: 'number', value: '40' }, { name: 'hasSword', type: 'bool', value: 'false' }],
+    nodes: [
+      ['s', 'dlgStart', { text: $t('Silah tüccarı'), dlgId: 'weapon_shop' }],
+      ['l1', 'dlgLine', { speaker: 'merchant', text: $t('Bu çelik kılıç 50 altın. Kesende {gold} altın var gibi görünüyor.') }],
+      ['c', 'dlgChoice', { options: [opt('o1', $t('Satın al (50 altın)'), 'gold >= 50 and not hasSword'), opt('o2', $t('Çok pahalı, sonra gelirim.'))] }],
+      ['a', 'dlgAction', { actions: 'gold -= 50\nhasSword = true\n@give_item steel_sword 1' }],
+      ['l2', 'dlgLine', { speaker: 'merchant', text: $t('İyi günlerde kullan!'), emotion: 'happy' }],
+      ['l3', 'dlgLine', { speaker: 'merchant', text: $t('Paran olunca yine gel.') }],
+      ['e1', 'dlgEnd', { text: 'bought_sword' }],
+      ['e2', 'dlgEnd', { text: 'left_shop' }],
+    ],
+    edges: [['s', 'l1'], ['l1', 'c'], ['c', 'a', 'o1'], ['a', 'l2'], ['l2', 'e1'], ['c', 'l3', 'o2'], ['l3', 'e2']],
+  }), { icon: 'dlgPattern', alt: 'shop merchant buy gold' });
+  add('dlgpatterns', 'dlgQuest', $t('Görev ver / kabul et'), dlg({
+    characters: [{ id: 'elder', name: $t('Köy Yaşlısı'), color: '#b26bff' }],
+    variables: [{ name: 'wolfQuest', type: 'number', value: '0' }],
+    nodes: [
+      ['s', 'dlgStart', { text: $t('Kurt görevi'), dlgId: 'wolf_quest' }],
+      ['b', 'dlgBranch', { cond: 'wolfQuest == 1' }],
+      ['l0', 'dlgLine', { speaker: 'elder', text: $t('Kurtları hallettin mi? Köy hâlâ tehlikede.'), emotion: 'worried' }],
+      ['l1', 'dlgLine', { speaker: 'elder', text: $t('Yabancı, köyümüzü kurtlar basıyor. Bize yardım eder misin?'), emotion: 'sad' }],
+      ['c', 'dlgChoice', { options: [opt('o1', $t('Elbette, yardım ederim.')), opt('o2', $t('Bu benim sorunum değil.'))] }],
+      ['a', 'dlgAction', { actions: 'wolfQuest = 1\n@start_quest wolves' }],
+      ['l2', 'dlgLine', { speaker: 'elder', text: $t('Sağ ol! Kurtlar kuzeydeki ormanda.'), emotion: 'happy' }],
+      ['l3', 'dlgLine', { speaker: 'elder', text: $t('Anlıyorum... Fikrini değiştirirsen buradayım.'), emotion: 'sad' }],
+      ['e0', 'dlgEnd', { text: 'reminded' }],
+      ['e1', 'dlgEnd', { text: 'quest_accepted' }],
+      ['e2', 'dlgEnd', { text: 'quest_declined' }],
+    ],
+    edges: [['s', 'b'], ['b', 'l0', 'true'], ['b', 'l1', 'false'], ['l0', 'e0'], ['l1', 'c'], ['c', 'a', 'o1'], ['a', 'l2'], ['l2', 'e1'], ['c', 'l3', 'o2'], ['l3', 'e2']],
+  }), { icon: 'dlgPattern', alt: 'quest accept decline' });
+  add('dlgpatterns', 'dlgOnce', $t('İlk karşılaşma / tekrar'), dlg({
+    characters: [{ id: 'innkeeper', name: $t('Hancı'), color: '#ff8a65' }],
+    variables: [{ name: 'metInnkeeper', type: 'bool', value: 'false' }],
+    nodes: [
+      ['s', 'dlgStart', { text: $t('Hancı'), dlgId: 'innkeeper' }],
+      ['b', 'dlgBranch', { cond: 'metInnkeeper' }],
+      ['l1', 'dlgLine', { speaker: 'innkeeper', text: $t('Yine hoş geldin! Her zamankinden mi?'), emotion: 'happy' }],
+      ['a', 'dlgAction', { actions: 'metInnkeeper = true' }],
+      ['l2', 'dlgLine', { speaker: 'innkeeper', text: $t('Hoş geldin yabancı! Seni daha önce buralarda görmedim.') }],
+      ['e', 'dlgEnd', { text: '' }],
+    ],
+    edges: [['s', 'b'], ['b', 'l1', 'true'], ['b', 'a', 'false'], ['a', 'l2'], ['l1', 'e'], ['l2', 'e']],
+  }), { icon: 'dlgPattern', alt: 'first meeting once flag' });
+
   const SECTIONS = [
     { id: 'uml', label: 'UML' },
     { id: 'flow', label: $t('Akış Şeması') },
     { id: 'unity', label: $t('Unity Sınıfları') },
     { id: 'patterns', label: $t('Unity Desenleri') },
     { id: 'unityflow', label: $t('Unity Akışları & Döngüler') },
+    // yalnızca diyalog sekmelerinde görünür
+    { id: 'dialogue', label: $t('Diyalog'), dlg: true },
+    { id: 'dlgpatterns', label: $t('Hazır Diyaloglar'), dlg: true },
   ];
 
   /* Unity hazır üye kısayolları (panel menüleri için) */

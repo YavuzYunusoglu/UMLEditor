@@ -101,7 +101,10 @@
         const v = props[k];
         if (v == null || v === false) continue;
         if (k === 'class') el.className = v;
-        else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+        else if (k === 'style' && typeof v === 'object') {
+          // CSS değişkenleri (--chip gibi) yalnızca setProperty ile atanabilir
+          for (const p in v) { if (p.startsWith('--')) el.style.setProperty(p, v[p]); else el.style[p] = v[p]; }
+        }
         else if (k === 'html') el.innerHTML = v;
         else if (k === 'dataset') Object.assign(el.dataset, v);
         else if (k === 'value') el.value = v;

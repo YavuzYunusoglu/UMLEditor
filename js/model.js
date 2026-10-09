@@ -8,8 +8,10 @@
 
   const DOC_VERSION = 1;
 
-  function newTab(name) {
-    return { id: uid('tab'), name: name || $t('Diyagram'), nodes: [], edges: [], routing: 'orthogonal', view: { x: 80, y: 60, zoom: 1 } };
+  function newTab(name, kind) {
+    const t = { id: uid('tab'), name: name || $t('Diyagram'), nodes: [], edges: [], routing: 'orthogonal', view: { x: 80, y: 60, zoom: 1 } };
+    if (kind === 'dialogue') t.kind = 'dialogue';
+    return t;
   }
 
   function newDoc(name) {
@@ -22,6 +24,8 @@
     const n = { id: uid('n'), type, x: Math.round(x || 0), y: Math.round(y || 0) };
     if (type === 'class') {
       Object.assign(n, { name: $t('YeniSinif'), stereotype: '', namespace: '', abstract: false, attributes: '', methods: '', showMembers: true, w: 0 });
+    } else if (meta.dlg) {
+      Object.assign(n, { w: meta.w, h: meta.h }, App.Dialogue.defaults(type));
     } else {
       Object.assign(n, { w: meta.w, h: meta.h, text: type === 'frame' ? $t('Grup') : (type === 'connector' ? '' : meta.label) });
     }
@@ -66,6 +70,7 @@
       const ids = new Set(t.nodes.map((n) => n.id));
       t.edges = (t.edges || []).filter((e) => e && e.id && ids.has(e.from) && ids.has(e.to));
       t.routing = t.routing || 'orthogonal';
+      if (t.kind !== 'dialogue') delete t.kind;
       if (!t.view || !isFinite(t.view.zoom)) t.view = { x: 80, y: 60, zoom: 1 };
       for (const n of t.nodes) {
         n.x = +n.x || 0; n.y = +n.y || 0;
@@ -78,10 +83,13 @@
           const m = SHAPES[n.type] || SHAPES.process;
           n.w = +n.w || m.w; n.h = +n.h || m.h;
           if (n.text == null) n.text = '';
+          if (m.dlg) App.Dialogue.normalizeNode(n);
         }
       }
       for (const e of t.edges) if (!EDGE_TYPES[e.type]) e.type = 'association';
+      if (App.Dialogue.isDialogueTab(t)) { t.kind = 'dialogue'; App.Dialogue.sync(t); }
     }
+    App.Dialogue.normalizeReg(doc);
     if (!doc.tabs.some((t) => t.id === doc.activeTab)) doc.activeTab = doc.tabs[0].id;
     return doc;
   }

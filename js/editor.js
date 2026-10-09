@@ -3,6 +3,9 @@
 (function (global) {
   const App = global.App;
   const { U, Store, Geo, UML, Model } = App;
+  const isDlg = (n) => App.Dialogue.isDlg(n);
+  // genişliği elle, yüksekliği içerikten belirlenen düğümler
+  const widthOnly = (n) => n.type === 'class' || isDlg(n);
   const $t = App.$t;
 
   const GRID = 20, SNAP = 10;
@@ -107,7 +110,7 @@
       se: [b.x + b.w, b.y + b.h], s: [b.x + b.w / 2, b.y + b.h], sw: [b.x, b.y + b.h], w: [b.x, b.y + b.h / 2],
     };
     let keys = Object.keys(all);
-    if (n.type === 'class') keys = ['e', 'w'];
+    if (widthOnly(n)) keys = ['e', 'w'];
     else if (n.type === 'connector') keys = ['nw', 'ne', 'se', 'sw'];
     return keys.map((k) => [k, all[k][0], all[k][1]]);
   }
@@ -399,7 +402,7 @@
     if (!n) return;
     const b = Geo.bounds(n);
     Store.begin();
-    st = { mode: 'resize', id: n.id, handle, start: p, orig: b, moved: false, contentMin: n.type === 'class' ? Geo.classLayout(Object.assign({}, n, { w: 0 })).w : 0 };
+    st = { mode: 'resize', id: n.id, handle, start: p, orig: b, moved: false, contentMin: n.type === 'class' ? Geo.classLayout(Object.assign({}, n, { w: 0 })).w : isDlg(n) ? 160 : 0 };
   }
 
   function startConnect(nodeId, side, p) {
@@ -518,7 +521,7 @@
         if (hd.includes('w')) x1 = p.x; if (hd.includes('e')) x2 = p.x;
         if (hd.includes('n')) y1 = p.y; if (hd.includes('s')) y2 = p.y;
         if (snapOn(e)) { if (hd.includes('w')) x1 = sn(x1); if (hd.includes('e')) x2 = sn(x2); if (hd.includes('n')) y1 = sn(y1); if (hd.includes('s')) y2 = sn(y2); }
-        const minW = n.type === 'class' ? st.contentMin : 30, minH = 24;
+        const minW = widthOnly(n) ? st.contentMin : 30, minH = 24;
         if (x2 - x1 < minW) { if (hd.includes('w')) x1 = x2 - minW; else x2 = x1 + minW; }
         if (y2 - y1 < minH) { if (hd.includes('n')) y1 = y2 - minH; else y2 = y1 + minH; }
         if (e.shiftKey && hd.length === 2) {
@@ -528,7 +531,7 @@
           else { const nw = h * ratio; if (hd.includes('w')) x1 = x2 - nw; else x2 = x1 + nw; }
         }
         n.x = Math.round(x1);
-        if (n.type === 'class') { n.w = Math.round(x2 - x1); }
+        if (widthOnly(n)) { n.w = Math.round(x2 - x1); }
         else { n.y = Math.round(y1); n.w = Math.round(x2 - x1); n.h = Math.round(y2 - y1); }
         if (n.type === 'connector') { const s = Math.max(n.w, n.h); n.w = n.h = s; }
         requestRender();
@@ -617,6 +620,7 @@
               if (s.which === 'start') { ed.from = s.target; ed.fromSide = s.targetSide || undefined; }
               else { ed.to = s.target; ed.toSide = s.targetSide || undefined; }
               delete ed.mid;
+              App.Dialogue.sync(Store.tab);
             });
           }
         }
@@ -637,10 +641,11 @@
     let newNode = null;
     if (!target) {
       if (!s.moved || Math.hypot(s.cur.x - s.fixed.x, s.cur.y - s.fixed.y) * z < 40) return;
-      // boşluğa bırakıldı: aynı türden yeni düğüm oluştur
+      // boşluğa bırakıldı: aynı türden yeni düğüm oluştur (diyalogda sıradaki replik)
       let type = src.type === 'class' ? 'class' : src.type === 'note' ? 'note' : 'process';
       if (src.type === 'frame' || src.type === 'text') type = 'process';
-      newNode = Model.createNode(type, 0, 0, type === 'class' ? { name: $t('YeniSinif') } : null);
+      if (isDlg(src)) type = 'dlgLine';
+      newNode = Model.createNode(type, 0, 0, type === 'class' ? { name: $t('YeniSinif') } : type === 'dlgLine' ? { speaker: App.Dialogue.guessSpeaker(tab, src) } : null);
       const size = Geo.nodeSize(newNode);
       newNode.x = Math.round(sn(s.cur.x) - size.w / 2);
       newNode.y = Math.round(sn(s.cur.y) - size.h / 2);
@@ -660,6 +665,7 @@
     Store.mutate(() => {
       if (newNode) tab.nodes.push(newNode);
       tab.edges.push(edge);
+      App.Dialogue.onConnect(src, edge, tab);
     });
     if (newNode) {
       Store.select([newNode.id], []);
@@ -684,7 +690,14 @@
       const n = Store.node(nodeEl.dataset.node);
       if (!n) return;
       let field = null;
-      if (n.type === 'class') {
+      if (isDlg(n)) {
+        field = App.Dialogue.hitField(n, p);
+        if (field === 'speaker' && App.DialogueUI) {
+          Store.select([n.id], []);
+          App.DialogueUI.speakerMenu(n, e.clientX, e.clientY);
+          return;
+        }
+      } else if (n.type === 'class') {
         const Lc = Geo.classLayout(n);
         const ry = p.y - n.y;
         field = !Lc.show || ry < Lc.headerH ? 'name' : (Lc.methY && ry >= Lc.methY ? 'methods' : 'attributes');
@@ -855,6 +868,11 @@
     if (!n) return;
     renderNow();
     const b = Geo.bounds(n);
+    if (isDlg(n)) {
+      const sp = App.Dialogue.inlineSpec(n, field);
+      if (sp) showInline(sp.rect, sp.value || '', sp.opts, (v) => Store.mutate(() => sp.apply(v)));
+      return;
+    }
     if (n.type === 'class') {
       const Lc = Geo.classLayout(n);
       field = field || 'name';
@@ -942,8 +960,9 @@
   function insertFragment(frag, opts) {
     opts = opts || {};
     const nodes = frag.nodes;
+    App.Dialogue.prepareInsert(Store.doc, frag);
     for (const n of nodes) {
-      if (n.type !== 'class' && n.type !== 'frame' && n.type !== 'connector' && n.text) {
+      if (n.type !== 'class' && n.type !== 'frame' && n.type !== 'connector' && !isDlg(n) && n.text) {
         const need = Geo.requiredHeight(n);
         if (need > n.h) { n.y -= Math.round((need - n.h) / 2); n.h = need; }
       }
@@ -959,7 +978,10 @@
     } else if (opts.offset) { dx = dy = opts.offset; }
     for (const n of nodes) { n.x = Math.round(n.x + dx); n.y = Math.round(n.y + dy); }
     let res;
-    Store.mutate(() => { res = Store.insertFragment({ nodes, edges: frag.edges || [], offset: { x: dx, y: dy } }); });
+    Store.mutate(() => {
+      res = Store.insertFragment({ nodes, edges: frag.edges || [], offset: { x: dx, y: dy } });
+      App.Dialogue.mergeRegistry(Store.doc, frag);
+    });
     Store.select(res.nodes.map((n) => n.id), []);
     requestRender();
     return res;

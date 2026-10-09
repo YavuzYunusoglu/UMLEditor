@@ -10,7 +10,7 @@ const ctx = { console, globalThis: null, TextEncoder };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
 // Testler varsayılan dil (İngilizce) ile çalışır: vm bağlamında navigator yok
-for (const f of ['i18n.js', 'util.js', 'theme.js', 'uml.js', 'model.js', 'geometry.js', 'render.js', 'layout.js', 'templates.js', 'csharp.js', 'mermaid.js', 'zip.js']) {
+for (const f of ['i18n.js', 'util.js', 'theme.js', 'uml.js', 'model.js', 'geometry.js', 'dialogue.js', 'render.js', 'layout.js', 'templates.js', 'csharp.js', 'mermaid.js', 'zip.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
 const App = ctx.App;
@@ -368,6 +368,132 @@ test('Zip: geçerli imzalar ve CRC', () => {
   const eocd = bytes.length - 22;
   assert.strictEqual(dv.getUint32(eocd, true), 0x06054b50);
   assert.strictEqual(dv.getUint16(eocd + 10, true), 2);
+});
+
+/* ---------- Oyun diyalogları ---------- */
+const DL = App.Dialogue;
+function dialogueDoc(templateId) {
+  const doc = App.Model.newDoc('d');
+  const tab = App.Model.newTab('t', 'dialogue');
+  doc.tabs = [tab]; doc.activeTab = tab.id;
+  App.Store.load(doc);
+  const frag = App.Templates.byId(templateId).build();
+  App.Layout.layered(frag.nodes, frag.edges, {});
+  App.Store.mutate(() => { App.Store.insertFragment(frag); DL.mergeRegistry(App.Store.doc, frag); });
+  return App.Store.doc;
+}
+test('Diyalog: koşul ifadeleri', () => {
+  const v = { gold: 40, hasKey: true, name: 'Arin', stage: 2 };
+  const ev = (s) => DL.test(s, v);
+  assert.strictEqual(ev('gold >= 40').value, true);
+  assert.strictEqual(ev('gold > 40 or hasKey').value, true);
+  assert.strictEqual(ev('not hasKey').value, false);
+  assert.strictEqual(ev('!(gold < 10) && name == "Arin"').value, true);
+  assert.strictEqual(ev('stage * 10 + 5 == 25').value, true);
+  assert.strictEqual(ev('unknownFlag').value, false);
+  assert.strictEqual(ev('unknownFlag == false').value, true);
+  assert.ok(ev('gold = 5').error);
+  assert.ok(ev('gold >= ').error);
+  assert.ok(ev('(gold > 1').error);
+  assert.deepStrictEqual(plain(DL.check('a.b > c and d').vars), ['a.b', 'c', 'd']);
+});
+test('Diyalog: eylem satırları', () => {
+  const a = plain(DL.parseActions('gold -= 50\n// yorum\nhasSword = true\nvisits++\n@give_item steel_sword 1\n@say("hello there", 2)\ngold == 3'));
+  assert.strictEqual(a.length, 6);
+  assert.deepStrictEqual([a[0].type, a[0].variable, a[0].op, a[0].value], ['set', 'gold', '-=', '50']);
+  assert.deepStrictEqual([a[2].op, a[2].value], ['+=', '1']);
+  assert.deepStrictEqual([a[3].name, a[3].args], ['give_item', ['steel_sword', '1']]);
+  assert.deepStrictEqual(a[4].args, ['hello there', '2']);
+  assert.ok(a[5].error && a[5].line === 7);
+});
+test('Diyalog: şablonlar sorunsuz, dışa aktarım bağlantıları tutarlı', () => {
+  for (const id of ['dlgGreeting', 'dlgShop', 'dlgQuest', 'dlgOnce']) {
+    const doc = dialogueDoc(id);
+    const issues = DL.validate(doc);
+    assert.deepStrictEqual(plain(issues.filter((i) => i.level === 'error')), [], id);
+    const data = DL.exportData(doc);
+    assert.strictEqual(data.format, 'umlstudio-dialogue');
+    assert.strictEqual(data.dialogues.length, 1);
+    const d = data.dialogues[0];
+    const ids = new Set(d.nodes.map((n) => n.id));
+    assert.ok(ids.has(d.start), id + ' start');
+    for (const n of d.nodes) {
+      const refs = [n.next, n.ifTrue, n.ifFalse].concat((n.options || []).map((o) => o.next)).filter((x) => x != null);
+      for (const r of refs) assert.ok(ids.has(r), id + ': ' + n.type + ' -> ' + r);
+      assert.ok(['line', 'choice', 'condition', 'action', 'jump', 'end'].includes(n.type));
+    }
+    // JsonUtility uyumu: değişken varsayılanları metin
+    for (const v of data.variables) assert.strictEqual(typeof v.defaultValue, 'string');
+  }
+});
+test('Diyalog: oynatıcı koşulları ve eylemleri uygular', () => {
+  const doc = dialogueDoc('dlgShop');
+  const r = new DL.Runner(doc);
+  let res = r.run(DL.allStarts(doc)[0]);
+  assert.strictEqual(res.stop.kind, 'line');
+  assert.ok(/40/.test(res.stop.text), 'metindeki {gold} doldurulur');
+  res = r.run(res.stop.next);
+  assert.strictEqual(res.stop.kind, 'choice');
+  assert.deepStrictEqual(plain(res.stop.options.map((o) => o.available)), [false, true]);
+  r.vars.gold = 120;
+  res = r.run({ tab: res.stop.tab, node: res.stop.node });
+  assert.deepStrictEqual(plain(res.stop.options.map((o) => o.available)), [true, true]);
+  res = r.run(r.choose(res.stop.options[0]));
+  assert.strictEqual(r.vars.gold, 70);
+  assert.strictEqual(r.vars.hasSword, true);
+  assert.ok(res.log.some((l) => l.event && /give_item/.test(l.text)));
+  res = r.run(res.stop.next);
+  assert.strictEqual(res.stop.kind, 'end');
+  assert.strictEqual(res.stop.result, 'bought_sword');
+});
+test('Diyalog: bir kez gösterilen seçenek ve döngü', () => {
+  const doc = dialogueDoc('dlgGreeting');
+  const r = new DL.Runner(doc);
+  let res = r.run(DL.allStarts(doc)[0]);
+  res = r.run(res.stop.next);
+  const once = res.stop.options[1];
+  assert.ok(once.option.once && once.available);
+  res = r.run(r.choose(once));            // muhafız cevap verir
+  res = r.run(res.stop.next);             // seçime geri döner
+  assert.strictEqual(res.stop.kind, 'choice');
+  assert.strictEqual(res.stop.options[1].available, false);
+});
+test('Diyalog: doğrulama hataları bulur', () => {
+  const doc = dialogueDoc('dlgQuest');
+  const tab = doc.tabs[0];
+  const br = tab.nodes.find((n) => n.type === 'dlgBranch');
+  const ch = tab.nodes.find((n) => n.type === 'dlgChoice');
+  br.cond = 'wolfQuest = 1';
+  ch.options.push(DL.newOption('x'));
+  tab.nodes.find((n) => n.type === 'dlgLine').speaker = 'nobody';
+  const msgs = DL.validate(doc).map((i) => i.level + ':' + i.msg).join('\n');
+  assert.ok(/error:.*==/.test(msgs), msgs);
+  assert.ok(/error:Option 3 is not connected/.test(msgs), msgs);
+  assert.ok(/warn:Unknown character: nobody/.test(msgs), msgs);
+});
+test('Diyalog: bağlantı senkronu seçenek / dal atar', () => {
+  const tab = App.Model.newTab('t', 'dialogue');
+  const c = App.Model.createNode('dlgChoice', 0, 0), b = App.Model.createNode('dlgBranch', 0, 0), l = App.Model.createNode('dlgLine', 0, 0);
+  tab.nodes.push(c, b, l);
+  const e1 = App.Model.createEdge(c.id, l.id, 'flow'), e2 = App.Model.createEdge(c.id, b.id, 'flow');
+  const e3 = App.Model.createEdge(b.id, l.id, 'flow'), e4 = App.Model.createEdge(b.id, c.id, 'flow');
+  tab.edges.push(e1, e2, e3, e4);
+  DL.sync(tab);
+  assert.strictEqual(c.options.length, 2);
+  assert.notStrictEqual(e1.opt, e2.opt);
+  assert.deepStrictEqual([e3.branch, e4.branch], ['true', 'false']);
+  // normalize de aynı düzeltmeyi yapar ve sekmeyi diyalog olarak işaretler
+  const d = App.Model.normalize({ tabs: [{ nodes: [{ id: 'a', type: 'dlgChoice' }, { id: 'b', type: 'dlgEnd' }], edges: [{ id: 'e', from: 'a', to: 'b', type: 'flow' }] }] });
+  assert.strictEqual(d.tabs[0].kind, 'dialogue');
+  assert.strictEqual(d.tabs[0].nodes[0].options.length, 1);
+  assert.strictEqual(d.tabs[0].edges[0].opt, d.tabs[0].nodes[0].options[0].id);
+});
+test('Diyalog: kimlik üretimi ve C# modeli', () => {
+  assert.strictEqual(DL.slug('Köy Yaşlısı'), 'koy_yaslisi');
+  assert.strictEqual(DL.slug('  ', 'x'), 'x');
+  const cs = DL.csharpModel();
+  for (const k of ['class DialogueDatabase', 'class DialogueNode', 'public string ifTrue', 'public DialogueOption[] options', 'public string defaultValue']) assert.ok(cs.includes(k), k);
+  assert.ok(!/[^\x00-\x7F]/.test(cs), 'C# dosyası ASCII');
 });
 
 /* ---------- Çeviri (i18n) ---------- */
