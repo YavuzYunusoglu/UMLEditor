@@ -239,8 +239,27 @@
     const text = textInput(o.text, (v) => { o.text = v; }, { placeholder: $t('Oyuncunun söyleyeceği') });
     text.dataset.opt = o.id;
     const [cond, hint] = exprInput(o.cond, (v) => { o.cond = v; }, $t('Koşul (isteğe bağlı), ör. gold >= 50'));
-    const once = checkbox($t('Seçildikten sonra gizle (bir kez)'), o.once, (v) => { if (v) o.once = true; else delete o.once; });
-    return h('div', { class: 'dl-opt' }, head, text, cond, hint, once);
+    return h('div', { class: 'dl-opt' }, head, text, cond, hint, limitRow(o));
+  }
+
+  /* "[x] [3] kez seçildikten sonra gizle": sayı kutusu yalnızca kutu işaretliyken etkin */
+  function limitRow(o) {
+    const lim = D.pickLimit(o);
+    const cb = h('input', { type: 'checkbox', checked: !!lim });
+    const num = h('input', { class: 'input num dl-limit-n', type: 'number', min: 1, max: 999, step: 1, value: lim || 1, disabled: !lim, title: $t('Kaç kez seçilebilir') });
+    cb.addEventListener('change', () => {
+      Store.mutate(() => { if (cb.checked) o.maxPicks = Math.max(1, Math.min(999, parseInt(num.value, 10) || 1)); else delete o.maxPicks; });
+      num.disabled = !cb.checked;
+      if (cb.checked) { num.focus(); num.select(); }
+      App.Editor.requestRender();
+    });
+    num.addEventListener('focus', () => Store.begin());
+    num.addEventListener('blur', () => { if (!(parseInt(num.value, 10) >= 1)) num.value = D.pickLimit(o) || 1; Store.end(); });
+    num.addEventListener('input', () => {
+      const v = parseInt(num.value, 10);
+      if (v >= 1 && v <= 999 && cb.checked) { o.maxPicks = v; App.Editor.requestRender(); }
+    });
+    return h('label', { class: 'p-check dl-limit' }, cb, num, h('span', null, $t('kez seçildikten sonra gizle')));
   }
 
   /* ---------------- Düğüm paneli ---------------- */
@@ -468,7 +487,8 @@
       h('div', { class: 'p-stats' }, stat(cnt('dlgStart'), $t('diyalog')), stat(cnt('dlgLine'), $t('replik')), stat(cnt('dlgChoice'), $t('seçim'))),
       h('div', { class: 'p-row wrap' },
         btn($t('Oynat'), () => playtest(), { icon: 'play', primary: true }),
-        btn($t('JSON dışa aktar'), () => exportDialog(), { icon: 'export' }))));
+        btn($t('JSON dışa aktar'), () => exportDialog(), { icon: 'export' }),
+        btn($t('Unity JSON'), () => exportDialog('unity'), { icon: 'export' }))));
 
     out.push(section($t('Karakterler'),
       h('div', { class: 'dl-list' }, R.characters.length ? R.characters.map(charRow) : h('div', { class: 'p-hint' }, $t('Henüz karakter yok.'))),
@@ -573,7 +593,7 @@
           if (!o.available && !showLocked) continue;
           const b = h('button', { class: 'pl-opt' + (o.available ? '' : ' locked'), disabled: !o.available },
             h('span', { class: 'pl-n' }, String(o.index + 1)), h('span', { class: 'pl-otext md', html: o.text ? App.Md.toHtml(o.text, true) : U.esc($t('(boş seçenek)')) }),
-            o.available ? null : h('span', { class: 'pl-why' }, o.reason));
+            o.available ? (o.limit ? h('span', { class: 'pl-why left' }, $t('{n} hak kaldı', { n: o.left })) : null) : h('span', { class: 'pl-why' }, o.reason));
           if (o.available) {
             k++;
             b.addEventListener('click', () => pick(o));
@@ -651,11 +671,12 @@
   }
 
   /* ---------------- JSON dışa aktarım ---------------- */
-  function exportDialog() {
+  /* target: 'full' (tüm ayrıntılar) ya da 'unity' (yalnızca diyaloglar, seçimler ve sonuçları) */
+  function exportDialog(target) {
     const doc = Store.doc;
     if (!doc.tabs.some(D.isDialogueTab)) { UI.toast($t('Belgede diyalog sekmesi yok'), 'warn'); return; }
     const onDlgTab = D.isDialogueTab(Store.tab);
-    const opts = { scope: 'all', pretty: true };
+    const opts = { scope: 'all', pretty: true, target: target === 'unity' ? 'unity' : 'full' };
     const seg = (key, options) => {
       const w = h('div', { class: 'seg' });
       for (const [v, l] of options) {
@@ -667,35 +688,44 @@
     };
     const ta = h('textarea', { class: 'input area mono dl-json', rows: 18, spellcheck: false, readOnly: true });
     const summary = h('div', { class: 'dl-sum' });
+    const intro = h('p', { class: 'modal-text' });
     let text = '';
     const update = () => {
       const tabId = opts.scope === 'tab' ? Store.tab.id : null;
-      const data = D.exportData(doc, { tabId });
+      const unity = opts.target === 'unity';
+      const data = unity ? D.exportUnity(doc, { tabId }) : D.exportData(doc, { tabId });
       text = JSON.stringify(data, null, opts.pretty ? 2 : 0);
       ta.value = text;
+      intro.textContent = unity
+        ? $t('Unity için sade JSON: yalnızca diyaloglar, replikler, seçimler ve sonuçları. Renkler, karakter listesi, duygu / ses / etiket ve biçim bilgisi yazılmaz; konuşmacı adıyla gelir.')
+        : $t('Oyun motorunuzun okuyacağı JSON. Her diyalog bir Başlangıç düğümüdür; düğümler kimlikleriyle birbirine bağlanır.');
       const issues = D.validate(doc, tabId);
       const errs = issues.filter((i) => i.level === 'error');
       const nodes = data.dialogues.reduce((k, d) => k + d.nodes.length, 0);
+      const choices = data.dialogues.reduce((k, d) => k + d.nodes.reduce((j, n) => j + (n.choices || n.options || []).length, 0), 0);
       summary.replaceChildren(
-        h('div', { class: 'p-hint' }, $t('{d} diyalog, {n} düğüm, {c} karakter, {v} değişken', { d: data.dialogues.length, n: nodes, c: data.characters.length, v: data.variables.length })),
+        h('div', { class: 'p-hint' }, unity
+          ? $t('{d} diyalog, {n} düğüm, {s} seçenek', { d: data.dialogues.length, n: nodes, s: choices })
+          : $t('{d} diyalog, {n} düğüm, {c} karakter, {v} değişken', { d: data.dialogues.length, n: nodes, c: data.characters.length, v: data.variables.length })),
         errs.length
           ? h('div', { class: 'callout warn' }, h('b', null, $t('{n} hata var; oyunda sorun çıkarabilir:', { n: errs.length })),
             h('ul', null, errs.slice(0, 5).map((i) => h('li', null, i.msg + (i.node && Store.node(i.node, doc.tabs.find((t) => t.id === i.tab)) ? ' \u2014 ' + describe(Store.node(i.node, doc.tabs.find((t) => t.id === i.tab))) : '')))))
           : h('div', { class: 'p-hint dl-hint ok' }, '\u2713 ' + (issues.length ? $t('Hata yok ({w} uyarı)', { w: issues.length }) : $t('Sorun bulunamadı'))));
     };
-    const fileName = () => U.safeFileName(Store.doc.name) + (opts.scope === 'tab' ? '-' + U.safeFileName(Store.tab.name) : '') + '.dialogue.json';
+    const fileName = () => U.safeFileName(Store.doc.name) + (opts.scope === 'tab' ? '-' + U.safeFileName(Store.tab.name) : '') + (opts.target === 'unity' ? '.unity' : '') + '.dialogue.json';
     const body = h('div', null,
-      h('p', { class: 'modal-text' }, $t('Oyun motorunuzun okuyacağı JSON. Her diyalog bir Başlangıç düğümüdür; düğümler kimlikleriyle birbirine bağlanır.')),
+      intro,
       h('div', { class: 'p-row wrap dl-export-opts' },
+        h('label', { class: 'p-field' }, h('span', { class: 'p-label' }, $t('Hedef')), seg('target', [['unity', $t('Unity (sade)')], ['full', $t('Tam')]])),
         onDlgTab ? h('label', { class: 'p-field' }, h('span', { class: 'p-label' }, $t('Kapsam')), seg('scope', [['all', $t('Tüm diyalog sekmeleri')], ['tab', $t('Yalnızca bu sekme')]])) : null,
         h('label', { class: 'p-field' }, h('span', { class: 'p-label' }, $t('Biçim')), seg('pretty', [[true, $t('Okunaklı')], [false, $t('Sıkıştırılmış')]]))),
       summary, ta,
       h('details', { class: 'p-help' }, h('summary', null, $t('Oyunda nasıl kullanılır?')),
-        h('div', { class: 'p-help-body dl-howto', html: U.esc($t('1. Dialogue.start düğümünden başlayın. 2. line: konuşmacı ve metni gösterin, next ile devam edin. 3. choice: condition sağlanan seçenekleri gösterin, seçilenin next değerine gidin. 4. condition: koşulu değerlendirip ifTrue / ifFalse. 5. action: set ve event eylemlerini uygulayın. 6. jump: başka diyaloğa geçin. 7. end ya da next boşsa diyalog biter.')) })));
+        h('div', { class: 'p-help-body dl-howto', html: U.esc($t('1. Dialogue.start düğümünden başlayın. 2. line: konuşmacı ve metni gösterin, next ile devam edin. 3. choice: condition sağlanan ve maxPicks sınırına ulaşmamış seçenekleri gösterin, seçilenin next değerine gidin. 4. condition: koşulu değerlendirip ifTrue / ifFalse. 5. action: set ve event eylemlerini uygulayın. 6. jump: başka diyaloğa geçin. 7. end ya da next boşsa diyalog biter.')) })));
     UI.modal({
       title: $t('Diyalog JSON dışa aktar'), wide: true, body, noFocus: true,
       buttons: [
-        { label: $t('Unity C# sınıfları'), icon: 'code', action: () => { U.download('DialogueData.cs', '\uFEFF' + D.csharpModel(), 'text/plain'); return false; } },
+        { label: $t('Unity C# sınıfları'), icon: 'code', action: () => { U.download('DialogueData.cs', '\uFEFF' + (opts.target === 'unity' ? D.csharpUnityModel() : D.csharpModel()), 'text/plain'); return false; } },
         { spacer: true },
         { label: $t('Kopyala'), icon: 'copy', action: () => { UI.copyText(text); return false; } },
         { label: $t('İndir (.json)'), primary: true, icon: 'export', action: () => { U.download(fileName(), text, 'application/json'); UI.toast($t('İndirildi: {name}', { name: fileName() }), 'ok'); } },

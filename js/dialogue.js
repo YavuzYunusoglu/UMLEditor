@@ -16,7 +16,7 @@
   const CHAR_COLORS = ['#f5a623', '#4f8cff', '#3ecf8e', '#b26bff', '#ff6b6b', '#2bc0d6', '#ff8a65', '#e6c34a', '#f06292', '#8e9bb0'];
   const VAR_TYPES = ['bool', 'number', 'string'];
   const EXPORT_TYPE = { dlgLine: 'line', dlgChoice: 'choice', dlgBranch: 'condition', dlgAction: 'action', dlgJump: 'jump', dlgEnd: 'end' };
-  const FORMAT = 'umlstudio-dialogue', FORMAT_VERSION = 1;
+  const FORMAT = 'umlstudio-dialogue', FORMAT_VERSION = 2;
   const TRUE_COLOR = '#3ecf8e', FALSE_COLOR = '#ff6b6b';
 
   function defaults(type) {
@@ -34,6 +34,12 @@
   }
 
   function newOption(text) { return { id: U.uid('o'), text: text || '', cond: '' }; }
+  /* Seçeneğin kaç kez seçildikten sonra gizleneceği (0 = sınırsız). Eski belgelerdeki "once" = 1 */
+  function pickLimit(o) {
+    if (!o) return 0;
+    const v = o.maxPicks != null ? parseInt(o.maxPicks, 10) : o.once ? 1 : 0;
+    return v >= 1 ? Math.min(v, 999) : 0;
+  }
 
   /* Yüklenen düğümü tamamla / temizle */
   function normalizeNode(n) {
@@ -49,7 +55,8 @@
         if (seen.has(id)) id = U.uid('o');
         seen.add(id);
         const r = { id, text: o.text == null ? '' : String(o.text), cond: o.cond == null ? '' : String(o.cond) };
-        if (o.once) r.once = true;
+        const lim = pickLimit(o);
+        if (lim) r.maxPicks = lim;
         return r;
       });
     }
@@ -430,7 +437,7 @@
           const rich = Md().layout(o.text || ' ', { size: 13, lh: LH, width: w - OPT_X - PADX, inline: true });
           const cond = o.cond ? U.wrapText(o.cond, F_SMALL_MONO, w - OPT_X - PADX) : [];
           const hh = Math.max(LH, rich.h) + cond.length * COND_LH + 12;
-          rows.push({ id: o.id, y, h: hh, rich, textH: Math.max(LH, rich.h), cond, once: !!o.once, empty: !o.text });
+          rows.push({ id: o.id, y, h: hh, rich, textH: Math.max(LH, rich.h), cond, limit: pickLimit(o), empty: !o.text });
           y += hh;
         }
         if (!rows.length) y += 32;
@@ -619,7 +626,7 @@
       else s += Md().render(r.rich, x + OPT_X, ry + 6, { fill: T.text, dim: T.textDim, code: c.stroke });
       const cy = ry + 6 + r.textH;
       r.cond.forEach((ln, k) => { s += tx(x + OPT_X, cy + k * COND_LH + 11, ln, { size: 11, mono: true, fill: App.Theme.tint(T, '#f5a623').stroke }); });
-      if (r.once) s += tx(x + w - 8, ry + 19, '1\u00D7', { size: 11, bold: true, fill: T.textDim, anchor: 'end' });
+      if (r.limit) s += tx(x + w - 8, ry + 19, r.limit + '\u00D7', { size: 11, bold: true, fill: T.textDim, anchor: 'end' });
     });
     return s;
   }
@@ -996,7 +1003,8 @@
         o.options = n.options.map((op) => {
           const r = { id: n.id + '.' + op.id, text: plain(op.text, true) };
           if (op.cond.trim()) r.condition = op.cond.trim();
-          if (op.once) r.once = true;
+          const lim = pickLimit(op);
+          if (lim) r.maxPicks = lim;
           const e = out.find((x) => x.opt === op.id);
           r.next = e ? resolve(e.to) : null;
           return r;
@@ -1114,7 +1122,141 @@ public class DialogueOption
     public string id;
     public string text;
     public string condition;     // empty = always available
-    public bool once;            // hide after it has been picked once
+    public int maxPicks;         // hide after it has been picked this many times (0 = no limit)
+    public string next;
+}
+
+[Serializable]
+public class DialogueAction
+{
+    public string type;          // "set" or "event"
+    public string variable;      // set
+    public string op;            // set: "=", "+=", "-=", "*=", "/="
+    public string value;         // set: expression, e.g. "10" or "gold - 5"
+    public string name;          // event
+    public string[] args;        // event
+}
+`;
+  }
+
+  /* ---------------- Unity için sade JSON ----------------
+     Yalnızca diyaloglar, replikler, seçimler ve sonuçları. Renkler, karakter listesi, duygu / ses / etiket,
+     seçenek kimlikleri ve biçim bilgisi atılır; konuşmacı karakterin adıyla yazılır, boş alanlar yazılmaz.
+     Değişkenler yalnızca belgede tanımlıysa (koşullar onlara bakar) ad ve başlangıç değeriyle gelir. */
+  function exportUnity(doc, opts) {
+    const full = exportData(doc, opts);
+    const names = new Map(full.characters.map((c) => [c.id, c.name]));
+    const put = (o, k, v) => { if (v != null && v !== '' && !(Array.isArray(v) && !v.length)) o[k] = v; return o; };
+    const node = (n) => {
+      const o = { id: n.id, type: n.type };
+      switch (n.type) {
+        case 'line':
+          put(o, 'speaker', n.speaker ? names.get(n.speaker) || n.speaker : '');
+          put(o, 'text', n.text);
+          put(o, 'next', n.next);
+          break;
+        case 'choice':
+          put(o, 'text', n.text);
+          o.choices = n.options.map((op) => put(put(put(put({}, 'text', op.text), 'condition', op.condition), 'maxPicks', op.maxPicks), 'next', op.next));
+          break;
+        case 'condition':
+          put(o, 'condition', n.condition);
+          put(o, 'ifTrue', n.ifTrue);
+          put(o, 'ifFalse', n.ifFalse);
+          break;
+        case 'action':
+          o.actions = n.actions.map((a) => (a.type === 'event'
+            ? put({ type: 'event', name: a.name }, 'args', a.args)
+            : { type: 'set', variable: a.variable, op: a.op, value: a.value }));
+          put(o, 'next', n.next);
+          break;
+        case 'jump': put(o, 'dialogue', n.dialogue); break;
+        case 'end': put(o, 'result', n.result); break;
+      }
+      return o;
+    };
+    const out = {};
+    if (full.variables.length) out.variables = full.variables.map((v) => ({ name: v.name, value: v.defaultValue }));
+    out.dialogues = full.dialogues.map((d) => Object.assign(put(put({ id: d.id }, 'title', d.title), 'start', d.start), { nodes: d.nodes.map(node) }));
+    return out;
+  }
+
+  /* Sade Unity JSON'unu okuyan JsonUtility sınıfları */
+  function csharpUnityModel() {
+    return `// Generated by UML Studio. Data model for the simplified Unity dialogue JSON export.
+// Usage:
+//   DialogueDatabase db = JsonUtility.FromJson<DialogueDatabase>(jsonAsset.text);
+//   Dialogue d = db.FindDialogue("weapon_shop");
+//   DialogueNode node = d.Find(d.start);
+// Node types: "line", "choice", "condition", "action", "jump", "end".
+// An empty "next" means the dialogue ends there. Conditions are plain strings (e.g. "gold >= 50 and not metBefore").
+using System;
+using UnityEngine;
+
+[Serializable]
+public class DialogueDatabase
+{
+    public DialogueVariable[] variables;   // only present when the dialogues use variables
+    public Dialogue[] dialogues;
+
+    public Dialogue FindDialogue(string id) => Array.Find(dialogues, d => d.id == id);
+}
+
+[Serializable]
+public class DialogueVariable
+{
+    public string name;
+    public string value;         // start value as text: "true", "40", "Arin"
+}
+
+[Serializable]
+public class Dialogue
+{
+    public string id;
+    public string title;
+    public string start;         // id of the first node
+    public DialogueNode[] nodes;
+
+    public DialogueNode Find(string nodeId) => string.IsNullOrEmpty(nodeId) ? null : Array.Find(nodes, n => n.id == nodeId);
+}
+
+[Serializable]
+public class DialogueNode
+{
+    public string id;
+    public string type;
+
+    // line
+    public string speaker;       // character name
+    public string text;          // line text, or the optional prompt of a choice
+
+    // line, action
+    public string next;
+
+    // choice
+    public DialogueChoice[] choices;
+
+    // condition
+    public string condition;
+    public string ifTrue;
+    public string ifFalse;
+
+    // action
+    public DialogueAction[] actions;
+
+    // jump
+    public string dialogue;
+
+    // end
+    public string result;
+}
+
+[Serializable]
+public class DialogueChoice
+{
+    public string text;
+    public string condition;     // empty = always available
+    public int maxPicks;         // hide after it has been picked this many times (0 = no limit)
     public string next;
 }
 
@@ -1141,7 +1283,7 @@ public class DialogueAction
   function Runner(doc) {
     this.doc = doc;
     this.vars = initialVars(doc);
-    this.used = new Set();
+    this.picks = new Map();      // seçenek anahtarı -> kaç kez seçildi
     this.steps = 0;
   }
   Runner.prototype.locate = function (nodeId) {
@@ -1198,8 +1340,9 @@ public class DialogueAction
               const r = test(o.cond, this.vars);
               if (r.error) { available = false; reason = r.error; } else if (!r.value) { available = false; reason = o.cond.trim(); }
             }
-            if (available && o.once && this.used.has(key)) { available = false; reason = $t('zaten seçildi'); }
-            return { index: i, key, option: o, text: interpolate(o.text, this.vars), available, reason, target: target && target.node ? target : null };
+            const limit = pickLimit(o), used = this.picks.get(key) || 0;
+            if (available && limit && used >= limit) { available = false; reason = limit === 1 ? $t('zaten seçildi') : $t('{n} kez seçildi', { n: used }); }
+            return { index: i, key, option: o, text: interpolate(o.text, this.vars), available, reason, limit, left: limit ? Math.max(0, limit - used) : 0, target: target && target.node ? target : null };
           });
           return { log, stop: Object.assign({ kind: 'choice', prompt: interpolate(n.text, this.vars), options }, at) };
         }
@@ -1229,16 +1372,16 @@ public class DialogueAction
     return { log, stop: { kind: 'error', text: $t('Sonsuz döngü: 500 adımdır oyuncuya hiçbir şey gösterilmedi') } };
   };
   Runner.prototype.choose = function (opt) {
-    if (opt.option.once) this.used.add(opt.key);
+    if (opt.limit) this.picks.set(opt.key, (this.picks.get(opt.key) || 0) + 1);
     return opt.target;
   };
 
   App.Dialogue = {
-    TYPES, isDlg, isFlow, isDialogueTab, cleanCharacter, defaults, normalizeNode, newOption, CHAR_COLORS, VAR_TYPES, FORMAT, FORMAT_VERSION,
+    TYPES, isDlg, isFlow, isDialogueTab, cleanCharacter, defaults, normalizeNode, newOption, pickLimit, CHAR_COLORS, VAR_TYPES, FORMAT, FORMAT_VERSION,
     reg, ensureReg, normalizeReg, character, addCharacter, renameCharacter, addVariable, mergeRegistry, slug, uniqueId,
     allStarts, findStart, prepareInsert,
     tokenize, parseExpr, check, evaluate, test, parseActions, splitArgs, interpolate, typedValue, fmt,
     layout, render, renderContext, edgeDecor, nodeColor, hitField, inlineSpec, sync, onConnect, guessSpeaker, previousLine, outEdges,
-    validate, issueMap, exportData, csharpModel, Runner, splitTags,
+    validate, issueMap, exportData, exportUnity, csharpModel, csharpUnityModel, Runner, splitTags,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

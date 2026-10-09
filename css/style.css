@@ -531,6 +531,9 @@ body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 .dl-opts { display: flex; flex-direction: column; gap: 8px; }
 .dl-opt { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel2); }
+.dl-limit { white-space: normal; }
+.dl-limit .input.num.dl-limit-n { width: 58px; flex: none; padding-top: 3px; padding-bottom: 3px; }
+.dl-limit .input.num.dl-limit-n:disabled { opacity: .5; }
 .dl-opt-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .dl-opt-head .icon-btn { width: 26px; height: 26px; flex: none; }
 .icon-btn.flip .ico { transform: rotate(180deg); }
@@ -595,6 +598,7 @@ button.dl-target:hover { background: var(--hover); color: var(--text); }
 .pl-n { flex: none; width: 22px; height: 22px; border-radius: 6px; background: var(--accent-weak2); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 650; }
 .pl-otext { flex: 1; }
 .pl-why { font: 11px "Cascadia Mono", Consolas, monospace; color: var(--warn); }
+.pl-why.left { color: var(--text3); }
 .pl-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .pl-vars { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow-y: auto; }
 .pl-var { display: grid; grid-template-columns: 1fr 100px; gap: 6px; align-items: center; font-size: 12.5px; }

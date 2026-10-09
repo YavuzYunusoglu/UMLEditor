@@ -452,11 +452,57 @@ test('Diyalog: bir kez gösterilen seçenek ve döngü', () => {
   let res = r.run(DL.allStarts(doc)[0]);
   res = r.run(res.stop.next);
   const once = res.stop.options[1];
-  assert.ok(once.option.once && once.available);
+  assert.ok(once.limit === 1 && once.available);
   res = r.run(r.choose(once));            // muhafız cevap verir
   res = r.run(res.stop.next);             // seçime geri döner
   assert.strictEqual(res.stop.kind, 'choice');
   assert.strictEqual(res.stop.options[1].available, false);
+});
+test('Diyalog: seçenek N kez seçildikten sonra gizlenir; eski "once" = 1', () => {
+  const doc = dialogueDoc('dlgGreeting');
+  const ch = doc.tabs[0].nodes.find((n) => n.type === 'dlgChoice');
+  ch.options[1].maxPicks = 3;
+  const r = new DL.Runner(doc);
+  let res = r.run(DL.allStarts(doc)[0]);
+  res = r.run(res.stop.next);
+  for (let k = 0; k < 3; k++) {
+    const o = res.stop.options[1];
+    assert.ok(o.available, 'seçim ' + (k + 1));
+    assert.strictEqual(o.left, 3 - k);
+    res = r.run(r.run(r.choose(o)).stop.next);
+    assert.strictEqual(res.stop.kind, 'choice');
+  }
+  assert.strictEqual(res.stop.options[1].available, false);
+  assert.strictEqual(DL.pickLimit({ once: true }), 1);
+  assert.strictEqual(DL.pickLimit({ maxPicks: '0' }), 0);
+  const d = App.Model.normalize({ tabs: [{ nodes: [{ id: 'a', type: 'dlgChoice', options: [{ id: 'o', text: 'x', once: true }] }], edges: [] }] });
+  assert.deepStrictEqual(plain(d.tabs[0].nodes[0].options[0]), { id: 'o', text: 'x', cond: '', maxPicks: 1 });
+  const opt = DL.exportData(doc).dialogues[0].nodes.find((n) => n.type === 'choice').options[1];
+  assert.strictEqual(opt.maxPicks, 3);
+  assert.ok(!('once' in opt));
+});
+test('Diyalog: Unity için sade JSON', () => {
+  for (const id of ['dlgGreeting', 'dlgShop', 'dlgQuest', 'dlgOnce']) {
+    const doc = dialogueDoc(id);
+    const full = DL.exportData(doc), data = DL.exportUnity(doc);
+    const text = JSON.stringify(data);
+    assert.ok(!/#[0-9a-f]{6}|"color"|"format"|"characters"|"emotion"|"audio"|"tags"|"options"/i.test(text), id + ': ' + text);
+    assert.deepStrictEqual(Object.keys(data).filter((k) => k !== 'variables'), ['dialogues']);
+    assert.strictEqual(!!data.variables, full.variables.length > 0);
+    const d = data.dialogues[0];
+    const ids = new Set(d.nodes.map((n) => n.id));
+    assert.ok(ids.has(d.start));
+    assert.strictEqual(d.nodes.length, full.dialogues[0].nodes.length);
+    for (const n of d.nodes) {
+      for (const v of Object.values(n)) assert.ok(v !== null && v !== '', id + ': boş alan yazılmaz');
+      const refs = [n.next, n.ifTrue, n.ifFalse].concat((n.choices || []).map((c) => c.next)).filter((x) => x != null);
+      for (const ref of refs) assert.ok(ids.has(ref), id + ' -> ' + ref);
+      if (n.type === 'line' && n.speaker) assert.ok(DL.reg(doc).characters.some((c) => c.name === n.speaker), 'konuşmacı adıyla');
+    }
+  }
+  const cs = DL.csharpUnityModel();
+  for (const k of ['class DialogueDatabase', 'public DialogueChoice[] choices', 'public int maxPicks']) assert.ok(cs.includes(k), k);
+  assert.ok(!/[^\x00-\x7F]/.test(cs), 'C# dosyası ASCII');
 });
 test('Diyalog: doğrulama hataları bulur', () => {
   const doc = dialogueDoc('dlgQuest');

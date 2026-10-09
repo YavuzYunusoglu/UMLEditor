@@ -236,7 +236,7 @@ Add a **Game dialogue** tab with the **+** button in the tab bar (or *New dialog
 |---|---|
 | **Start** | The entry point of one conversation. The game starts the conversation with its **dialogue ID** (e.g. `weapon_shop`). A tab can hold several conversations. |
 | **Line** | A character says something: speaker, text, emotion/portrait, voice clip ID and tags. The header uses the character's colour. Write `{gold}` in the text to show a variable's value. |
-| **Player Choice** | The options the player picks from. Each connection that leaves the node is one option, and its number is shown on the connection. An option can have a **condition** (it is hidden when the condition is false) and can be **shown only once**. |
+| **Player Choice** | The options the player picks from. Each connection that leaves the node is one option, and its number is shown on the connection. An option can have a **condition** (it is hidden when the condition is false) and can be **hidden after it has been picked a set number of times** (for example 3; the badge `3×` shows the limit). |
 | **Condition** | Branches on an expression such as `gold >= 50 and not metBefore`, with a green **True** output and a red **False** output. |
 | **Action / Variable** | Changes game state (`gold -= 50`, `hasSword = true`, `visits++`) or sends an event to the game (`@give_item steel_sword 1`). |
 | **Jump to Dialogue** | Continues with another conversation, which can be on another tab. |
@@ -258,7 +258,7 @@ Working with dialogues:
 
 ```json
 {
-  "format": "umlstudio-dialogue", "version": 1, "project": "My RPG",
+  "format": "umlstudio-dialogue", "version": 2, "project": "My RPG",
   "characters": [{ "id": "merchant", "name": "Merchant", "color": "#3ecf8e" }],
   "variables":  [{ "name": "gold", "type": "number", "defaultValue": "40" }],
   "dialogues": [{
@@ -267,7 +267,7 @@ Working with dialogues:
       { "id": "n_1", "type": "line", "speaker": "merchant", "text": "This sword costs 50 gold.", "emotion": "happy", "next": "n_2" },
       { "id": "n_2", "type": "choice", "options": [
           { "id": "n_2.o1", "text": "Buy it", "condition": "gold >= 50", "next": "n_3" },
-          { "id": "n_2.o2", "text": "Too expensive", "once": true, "next": "n_7" } ] },
+          { "id": "n_2.o2", "text": "Too expensive", "maxPicks": 1, "next": "n_7" } ] },
       { "id": "n_3", "type": "action", "actions": [
           { "type": "set", "variable": "gold", "op": "-=", "value": "50" },
           { "type": "event", "name": "give_item", "args": ["steel_sword", "1"] } ], "next": "n_4" },
@@ -290,6 +290,27 @@ DialogueNode node = d.Find(d.start);
 The game then walks the nodes. For a `line`, show it and go to `next`. For a `choice`, show the options whose `condition` holds. For a `condition`, evaluate it and go to `ifTrue` or `ifFalse`. Apply the `actions` of an `action` node, switch to another dialogue on `jump`, and stop at `end` or when `next` is empty. Conditions use `== != < > <= >=`, `and or not` (or `&& || !`), numbers, `"strings"`, `true` / `false` and variable names.
 
 Character cards and the character page details (portrait, role, description, properties) are design notes and are not exported; the JSON only lists each character's `id`, `name` and `color`.
+
+**Simple JSON for Unity:** **Export → Dialogue JSON (Unity)…** (or the **Target: Unity (simple)** switch in the same dialog) writes only what the game needs to run the conversation: the dialogues, their lines, the choices and where each choice leads. Colours, the character list, emotion / audio / tags, option IDs and the format header are left out, speakers are written by name and empty fields are skipped. `variables` is only included when the document declares variables (conditions read them). Node IDs stay the same between exports, so you can use them in save games.
+
+```json
+{
+  "variables": [{ "name": "gold", "value": "40" }],
+  "dialogues": [{
+    "id": "weapon_shop", "title": "Weapon merchant", "start": "n_1",
+    "nodes": [
+      { "id": "n_1", "type": "line", "speaker": "Merchant", "text": "This sword costs 50 gold.", "next": "n_2" },
+      { "id": "n_2", "type": "choice", "choices": [
+          { "text": "Buy it", "condition": "gold >= 50", "next": "n_3" },
+          { "text": "Tell me about the town", "maxPicks": 3, "next": "n_5" },
+          { "text": "Too expensive", "next": "n_7" } ] },
+      { "id": "n_7", "type": "end", "result": "left_shop" }
+    ]
+  }]
+}
+```
+
+With **Unity (simple)** selected, the **Unity C# classes** button downloads the matching `DialogueData.cs` (same class names, with `DialogueChoice[] choices`).
 
 The dialogue design is saved with the rest of the document (`.uml.json`, autosave and Google Drive), so you keep editing it there. The exported JSON is the copy for the game.
 

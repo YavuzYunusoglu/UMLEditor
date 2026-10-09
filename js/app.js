@@ -426,6 +426,7 @@
     UI.dropdown($('btnExport'), () => [
       ...(Store.doc.tabs.some(App.Dialogue.isDialogueTab) ? [
         { header: $t('Oyun diyaloğu') },
+        { label: $t('Diyalog JSON (Unity)…'), icon: 'chat', action: () => App.DialogueUI.exportDialog('unity') },
         { label: $t('Diyalog JSON…'), icon: 'chat', action: () => App.DialogueUI.exportDialog() },
         { label: $t('Diyalog C# veri sınıfları'), icon: 'code', action: () => U.download('DialogueData.cs', '\uFEFF' + App.Dialogue.csharpModel(), 'text/plain') },
         { sep: true },
@@ -660,7 +661,8 @@
     if (App.Dialogue.isDialogueTab(Store.tab)) {
       items.unshift(
         act($t('Diyaloğu oynat'), 'play', () => App.DialogueUI.playtest(Store.sel.nodes.size === 1 ? [...Store.sel.nodes][0] : null)),
-        act($t('Diyalog JSON dışa aktar'), 'chat', () => App.DialogueUI.exportDialog()));
+        act($t('Diyalog JSON dışa aktar'), 'chat', () => App.DialogueUI.exportDialog()),
+        act($t('Unity için diyalog JSON dışa aktar'), 'chat', () => App.DialogueUI.exportDialog('unity')));
     }
     items.push(
       act($t('Yeni sekme'), 'plus', () => Actions.addTab()),

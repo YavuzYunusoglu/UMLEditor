@@ -332,7 +332,7 @@
       return { nodes, edges, layout: nodes.length > 1, characters: U.clone(spec.characters || []), variables: U.clone(spec.variables || []) };
     };
   }
-  const opt = (id, text, cond, once) => Object.assign({ id, text, cond: cond || '' }, once ? { once: true } : {});
+  const opt = (id, text, cond, maxPicks) => Object.assign({ id, text, cond: cond || '' }, maxPicks ? { maxPicks: maxPicks === true ? 1 : maxPicks } : {});
 
   add('dialogue', 'dlgStart', $t('Başlangıç'), dlg({ nodes: [['a', 'dlgStart', { text: $t('Yeni diyalog'), dlgId: 'new_dialogue' }]] }), { icon: 'dlgStart', alt: 'start entry' });
   add('dialogue', 'dlgLine', $t('Replik'), dlg({ nodes: [['a', 'dlgLine', { text: $t('Merhaba yolcu!') }]] }), { icon: 'dlgLine', alt: 'line npc speech' });

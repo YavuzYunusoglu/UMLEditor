@@ -236,7 +236,7 @@ Sekme çubuğundaki **+** düğmesinden **Oyun diyaloğu** sekmesi ekleyin (ya d
 |---|---|
 | **Başlangıç** | Bir konuşmanın giriş noktası. Oyun konuşmayı bu düğümün **diyalog kimliğiyle** (ör. `weapon_shop`) başlatır. Bir sekmede birden fazla konuşma olabilir. |
 | **Replik** | Bir karakterin söylediği söz: konuşmacı, metin, duygu/portre, ses kaydı kimliği ve etiketler. Başlık karakterin rengini alır. Metne `{gold}` yazarsanız değişkenin değeri gösterilir. |
-| **Oyuncu Seçimi** | Oyuncunun seçeceği seçenekler. Düğümden çıkan her bağlantı bir seçenektir ve numarası bağlantının üzerinde görünür. Bir seçeneğe **koşul** eklenebilir (koşul sağlanmazsa seçenek gizlenir) ve seçenek **yalnızca bir kez** gösterilebilir. |
+| **Oyuncu Seçimi** | Oyuncunun seçeceği seçenekler. Düğümden çıkan her bağlantı bir seçenektir ve numarası bağlantının üzerinde görünür. Bir seçeneğe **koşul** eklenebilir (koşul sağlanmazsa seçenek gizlenir) ve seçenek **belirlediğiniz sayıda seçildikten sonra gizlenebilir** (ör. 3; sınır `3×` rozetiyle görünür). |
 | **Koşul** | `gold >= 50 and not metBefore` gibi bir ifadeye göre dallanır. Yeşil **Doğru** ve kırmızı **Yanlış** olmak üzere iki çıkışı vardır. |
 | **Olay / Değişken** | Oyun durumunu değiştirir (`gold -= 50`, `hasSword = true`, `visits++`) ya da oyuna olay gönderir (`@give_item steel_sword 1`). |
 | **Diyaloğa Atla** | Başka bir konuşmayla devam eder; o konuşma başka bir sekmede olabilir. |
@@ -258,7 +258,7 @@ Diyaloglarla çalışma:
 
 ```json
 {
-  "format": "umlstudio-dialogue", "version": 1, "project": "My RPG",
+  "format": "umlstudio-dialogue", "version": 2, "project": "My RPG",
   "characters": [{ "id": "merchant", "name": "Tüccar", "color": "#3ecf8e" }],
   "variables":  [{ "name": "gold", "type": "number", "defaultValue": "40" }],
   "dialogues": [{
@@ -267,7 +267,7 @@ Diyaloglarla çalışma:
       { "id": "n_1", "type": "line", "speaker": "merchant", "text": "Bu kılıç 50 altın.", "emotion": "happy", "next": "n_2" },
       { "id": "n_2", "type": "choice", "options": [
           { "id": "n_2.o1", "text": "Satın al", "condition": "gold >= 50", "next": "n_3" },
-          { "id": "n_2.o2", "text": "Çok pahalı", "once": true, "next": "n_7" } ] },
+          { "id": "n_2.o2", "text": "Çok pahalı", "maxPicks": 1, "next": "n_7" } ] },
       { "id": "n_3", "type": "action", "actions": [
           { "type": "set", "variable": "gold", "op": "-=", "value": "50" },
           { "type": "event", "name": "give_item", "args": ["steel_sword", "1"] } ], "next": "n_4" },
@@ -290,6 +290,27 @@ DialogueNode node = d.Find(d.start);
 Oyun bundan sonra düğümleri sırayla izler. `line` düğümünü gösterip `next` değerine geçer. `choice` düğümünde `condition` değeri sağlanan seçenekleri gösterir. `condition` düğümünde ifadeyi değerlendirip `ifTrue` ya da `ifFalse` değerine gider. `action` düğümünün eylemlerini uygular, `jump` düğümünde başka diyaloğa geçer ve `end` düğümünde ya da `next` boş olduğunda durur. Koşullarda `== != < > <= >=`, `and or not` (ya da `&& || !`), sayılar, `"metinler"`, `true` / `false` ve değişken adları kullanılır.
 
 Kişi kartları ve karakter sayfasındaki ayrıntılar (portre, rol, açıklama, özellikler) tasarım notudur ve dışa aktarılmaz; JSON her karakter için yalnızca `id`, `name` ve `color` alanlarını içerir.
+
+**Unity için sade JSON:** **Dışa Aktar → Diyalog JSON (Unity)…** (ya da aynı penceredeki **Hedef: Unity (sade)** seçimi) yalnızca oyunun konuşmayı yürütmek için ihtiyaç duyduğu şeyleri yazar: diyaloglar, replikler, seçimler ve her seçimin nereye gittiği. Renkler, karakter listesi, duygu / ses / etiket, seçenek kimlikleri ve biçim başlığı yazılmaz; konuşmacı adıyla gelir ve boş alanlar atlanır. `variables` yalnızca belgede değişken tanımlıysa eklenir (koşullar onları okur). Düğüm kimlikleri dışa aktarımlar arasında değişmez, kayıt dosyalarında kullanılabilir.
+
+```json
+{
+  "variables": [{ "name": "gold", "value": "40" }],
+  "dialogues": [{
+    "id": "weapon_shop", "title": "Silah tüccarı", "start": "n_1",
+    "nodes": [
+      { "id": "n_1", "type": "line", "speaker": "Tüccar", "text": "Bu kılıç 50 altın.", "next": "n_2" },
+      { "id": "n_2", "type": "choice", "choices": [
+          { "text": "Satın al", "condition": "gold >= 50", "next": "n_3" },
+          { "text": "Bana kasabadan bahset", "maxPicks": 3, "next": "n_5" },
+          { "text": "Çok pahalı", "next": "n_7" } ] },
+      { "id": "n_7", "type": "end", "result": "left_shop" }
+    ]
+  }]
+}
+```
+
+**Unity (sade)** seçiliyken **Unity C# sınıfları** düğmesi buna uyan `DialogueData.cs` dosyasını indirir (aynı sınıf adları, `DialogueChoice[] choices` ile).
 
 Diyalog tasarımı belgenin geri kalanıyla birlikte kaydedilir (`.uml.json`, otomatik kayıt ve Google Drive); düzenlemeye orada devam edersiniz. Dışa aktarılan JSON oyun için hazırlanan kopyadır.
 
