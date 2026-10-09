@@ -71,7 +71,7 @@ Tarayıcıda çalışan, ücretsiz ve çevrimdışı kullanılabilen bir **UML s
 | **Yerel sunucu** | Bu klasörde `python -m http.server 8000` çalıştırın, ardından <http://localhost:8000> adresini açın. | ✓ |
 | **İnternette** | [GitHub Pages'te yayınlayın](#github-pages-ile-yayınlama) ve her cihazdan açın. | ✓ |
 
-İlk açılışta, kurcalayabileceğiniz örnek bir Unity projesi (bir sınıf diyagramı ve iki akış şeması) yüklenir. Boş bir belgeyle başlamak için **Dosya → Yeni belge** seçin.
+İlk açılışta, kurcalayabileceğiniz örnek bir Unity projesi (bir sınıf diyagramı, iki akış şeması ve bir oyun diyaloğu) yüklenir. Yeni bir belgeyle başlamak için **Dosya → Yeni belge** seçin ve sınıf diyagramı, akış şeması ya da oyun diyaloğu arasından seçim yapın.
 
 ---
 

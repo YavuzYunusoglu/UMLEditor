@@ -71,7 +71,7 @@ A free, offline-first **UML class diagram and flowchart editor** for the browser
 | **Local server** | Run `python -m http.server 8000` in this folder, then open <http://localhost:8000>. | ✓ |
 | **Online** | [Publish on GitHub Pages](#publishing-on-github-pages) and open it on any device. | ✓ |
 
-On first launch, a sample Unity project (a class diagram plus two flowcharts) is loaded so you have something to explore. To start fresh, use **File → New document**.
+On first launch, a sample Unity project (a class diagram, two flowcharts and a game dialogue) is loaded so you have something to explore. To start fresh, use **File → New document** and choose a class diagram, a flowchart or a game dialogue.
 
 ---
 

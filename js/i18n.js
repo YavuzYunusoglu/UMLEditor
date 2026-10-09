@@ -727,6 +727,9 @@
     'Yine hoş geldin! Her zamankinden mi?': 'Welcome back! The usual?',
     'Hoş geldin yabancı! Seni daha önce buralarda görmedim.': 'Welcome, stranger! I haven\'t seen you around here before.',
     'Hazır Diyaloglar': 'Dialogue Templates',
+    'Sınıflar, arayüzler ve ilişkiler; Unity C# içe/dışa aktarma.': 'Classes, interfaces and relations; Unity C# import/export.',
+    'Başla/bitir, işlem, karar ve döngü şekilleri.': 'Start/end, process, decision and loop shapes.',
+    'Replikler, oyuncu seçimleri ve koşullar; oyuna JSON aktarma.': 'Lines, player choices and conditions; JSON export for the game.',
   };
 
   const DICTS = { en: EN };

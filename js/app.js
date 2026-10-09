@@ -10,9 +10,21 @@
 
   /* ======================= EYLEMLER ======================= */
   const Actions = App.Actions = {
-    async newDoc() {
-      if (Store.dirty && Store.tab.nodes.length && !(await UI.confirm($t('Yeni belge oluşturulsun mu? Kaydedilmemiş değişiklikler kaybolur (otomatik kayıt da sıfırlanır).'), { ok: $t('Yeni belge') }))) return;
+    /* Yeni belge: önce ne oluşturulacağını sor (sınıf diyagramı, akış şeması ya da oyun diyaloğu) */
+    async newDoc(kind) {
+      kind = kind || (await pickDocKind());
+      if (!kind) return;
       const d = Model.newDoc();
+      if (kind === 'flow') d.tabs[0].name = $t('Akış Şeması');
+      if (kind === 'dialogue') {
+        const t = Model.newTab($t('Diyalog'), 'dialogue');
+        const frag = App.Templates.byId('dlgGreeting').build();
+        App.Layout.layered(frag.nodes, frag.edges, {});
+        Store.insertFragment(frag, t);
+        App.Dialogue.mergeRegistry(d, frag);
+        d.tabs = [t];
+        d.activeTab = t.id;
+      }
       Store.load(d);
       IO.resetHandle();
       Editor.fitView();
@@ -322,6 +334,27 @@
 
     commandPalette(at) { openCommandPalette(at); },
   };
+
+  /* Yeni belge türü seçimi. Kaydedilmemiş değişiklik varsa uyarı da burada gösterilir. */
+  function pickDocKind() {
+    return new Promise((resolve) => {
+      let picked = null;
+      const kinds = [
+        ['class', $t('Sınıf diyagramı'), $t('Sınıflar, arayüzler ve ilişkiler; Unity C# içe/dışa aktarma.'), { icon: 'class', color: '#4f8cff' }],
+        ['flow', $t('Akış şeması'), $t('Başla/bitir, işlem, karar ve döngü şekilleri.'), { icon: 'flow' }],
+        ['dialogue', $t('Oyun diyaloğu'), $t('Replikler, oyuncu seçimleri ve koşullar; oyuna JSON aktarma.'), { icon: 'dlgPattern' }],
+      ];
+      const warn = Store.dirty && Store.tab.nodes.length;
+      const body = h('div', null,
+        warn ? h('div', { class: 'callout warn' }, $t('Yeni belge oluşturulsun mu? Kaydedilmemiş değişiklikler kaybolur (otomatik kayıt da sıfırlanır).')) : null,
+        h('div', { class: 'new-kinds' }, kinds.map(([k, title, desc, ic]) => h('button', {
+          class: 'new-kind',
+          onclick: () => { picked = k; m.close(); },
+        }, h('span', { class: 'new-kind-ico', html: UI.paletteIcon(ic) }), h('b', null, title), h('span', null, desc)))));
+      const m = UI.modal({ title: $t('Yeni belge'), body, wide: true, className: 'new-modal', noFocus: true, onClose: () => resolve(picked) });
+      setTimeout(() => { const b = m.box.querySelector('.new-kind'); if (b) b.focus(); }, 30);
+    });
+  }
 
   function kindColor(t) {
     if (t.kind === 'interface') return '#3ecf8e';
