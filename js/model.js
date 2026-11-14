@@ -92,13 +92,23 @@
       if (App.Dialogue.isDialogueTab(t)) { t.kind = 'dialogue'; App.Dialogue.sync(t); }
       // karakter sayfası: yalnızca diyalog sekmelerinde
       if (t.kind !== 'dialogue' || typeof t.owner !== 'string' || !t.owner) delete t.owner;
+      // kapalı sekme: belgede durur, yalnızca sekme çubuğunda görünmez
+      if (t.closed !== true) delete t.closed;
     }
     App.Dialogue.normalizeReg(doc);
-    if (!doc.tabs.some((t) => t.id === doc.activeTab)) doc.activeTab = doc.tabs[0].id;
+    fixActiveTab(doc);
     return doc;
   }
 
-  App.Model = { newDoc, newTab, createNode, createEdge, defaultEdgeType, normalize, isUmlNode, DOC_VERSION };
+  /* Etkin sekme var olmalı ve açık olmalı: değilse açık bir sekme seçilir, hiç yoksa etkin sekme yeniden açılır */
+  function fixActiveTab(doc) {
+    let t = doc.tabs.find((x) => x.id === doc.activeTab);
+    if (!t || t.closed) t = doc.tabs.find((x) => !x.closed) || t || doc.tabs[0];
+    delete t.closed;
+    doc.activeTab = t.id;
+  }
+
+  App.Model = { newDoc, newTab, createNode, createEdge, defaultEdgeType, normalize, fixActiveTab, isUmlNode, DOC_VERSION };
 
   /* ---------------- Store ---------------- */
   const listeners = {};
@@ -118,8 +128,9 @@
     node(id, tab) { return (tab || this.tab).nodes.find((n) => n.id === id); },
     edge(id, tab) { return (tab || this.tab).edges.find((e) => e.id === id); },
 
+    /* Geri alma anlık görüntüsü: görünüm, etkin sekme ve kapalı sekmeler (yalnızca görünürlük) dahil değil */
     serialize() {
-      return JSON.stringify(this.doc, (k, v) => (k === 'view' || k === 'activeTab' ? undefined : v));
+      return JSON.stringify(this.doc, function (k, v) { return k === 'view' || k === 'activeTab' || (k === 'closed' && Array.isArray(this.nodes)) ? undefined : v; });
     },
     begin() {
       if (this._depth === 0) this._tx = this.serialize();
@@ -166,10 +177,12 @@
     },
     _restore(json) {
       const views = new Map(this.doc.tabs.map((t) => [t.id, t.view]));
+      const closed = new Set(this.doc.tabs.filter((t) => t.closed).map((t) => t.id));
       const active = this.doc.activeTab;
       const d = JSON.parse(json);
-      d.tabs.forEach((t) => { t.view = views.get(t.id) || { x: 80, y: 60, zoom: 1 }; });
-      d.activeTab = d.tabs.some((t) => t.id === active) ? active : d.tabs[0].id;
+      d.tabs.forEach((t) => { t.view = views.get(t.id) || { x: 80, y: 60, zoom: 1 }; if (closed.has(t.id)) t.closed = true; });
+      d.activeTab = active;
+      fixActiveTab(d);
       this.doc = d;
       this.dirty = true;
       this._pruneSelection();
@@ -186,8 +199,12 @@
       this.emit('tab');
       this.emit('selection');
     },
+    /* Kapalı bir sekmeye geçmek onu yeniden açar */
     setActiveTab(id) {
-      if (this.doc.activeTab === id) return;
+      const t = this.doc.tabs.find((x) => x.id === id);
+      const reopened = !!(t && t.closed);
+      if (reopened) delete t.closed;
+      if (this.doc.activeTab === id) { if (reopened) this.emit('tab'); return; }
       this.doc.activeTab = id;
       this.sel.nodes.clear(); this.sel.edges.clear();
       this.emit('tab');

@@ -171,5 +171,15 @@
     return out;
   }
 
-  App.U = { uid, FONT_SANS, FONT_MONO, font, measure, wrapText, clamp, snap, esc, clone, parseHex, toHex, mix, rgba, isHex, debounce, h, download, readFileText, pickFiles, safeFileName, splitTop };
+  /* Dizide from öğesini to öğesinin önüne/arkasına taşır; değişiklik olduysa true */
+  function moveInArray(arr, from, to, after) {
+    const i = arr.indexOf(from);
+    if (i < 0 || from === to || arr.indexOf(to) < 0) return false;
+    arr.splice(i, 1);
+    const j = arr.indexOf(to) + (after ? 1 : 0);
+    arr.splice(j, 0, from);
+    return j !== i;
+  }
+
+  App.U = { uid, FONT_SANS, FONT_MONO, font, measure, wrapText, clamp, snap, esc, clone, parseHex, toHex, mix, rgba, isHex, debounce, h, download, readFileText, pickFiles, safeFileName, splitTop, moveInArray };
 })(typeof window !== 'undefined' ? window : globalThis);

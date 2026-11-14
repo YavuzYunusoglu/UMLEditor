@@ -95,24 +95,63 @@
       Store.mutate(() => { Store.doc.tabs.splice(Store.doc.tabs.indexOf(t) + 1, 0, c); });
       Store.setActiveTab(c.id);
     },
-    async closeTab(id) {
+    /* Sekmeyi kapat: silinmez, yalnızca sekme çubuğundan kalkar; soldaki Sayfalar listesinden
+       (karakter sayfaları karaktere çift tıklayarak da) kaldığı yerden yeniden açılır */
+    closeTab(id) {
+      const tabs = Store.doc.tabs, t = tabs.find((x) => x.id === id);
+      if (!t || t.closed) return;
+      const open = tabs.filter((x) => !x.closed);
+      if (open.length < 2) { UI.toast($t('Son açık sayfa kapatılamaz'), 'warn'); return; }
+      if (Store.doc.activeTab === id) {
+        const i = open.indexOf(t);
+        t.closed = true;
+        Store.setActiveTab(open[i > 0 ? i - 1 : 1].id);
+      } else {
+        t.closed = true;
+        Store.emit('tab');
+      }
+    },
+    async deleteTab(id) {
       const t = Store.doc.tabs.find((x) => x.id === id);
       if (!t) return;
       if (t.nodes.length && !(await UI.confirm($t('"{name}" sekmesi silinsin mi? (Geri alınabilir)', { name: t.name }), { ok: $t('Sil'), danger: true }))) return;
       Store.mutate(() => {
-        const i = Store.doc.tabs.indexOf(t);
-        Store.doc.tabs.splice(i, 1);
-        if (!Store.doc.tabs.length) Store.doc.tabs.push(Model.newTab($t('Diyagram')));
-        if (Store.doc.activeTab === id) Store.doc.activeTab = Store.doc.tabs[Math.max(0, i - 1)].id;
+        const tabs = Store.doc.tabs, i = tabs.indexOf(t);
+        tabs.splice(i, 1);
+        if (!tabs.length) tabs.push(Model.newTab($t('Diyagram')));
+        if (Store.doc.activeTab === id) Store.doc.activeTab = (tabs.slice(0, i).reverse().find((x) => !x.closed) || tabs.slice(i).find((x) => !x.closed) || tabs[Math.max(0, i - 1)]).id;
+        Model.fixActiveTab(Store.doc);
       });
       Store.emit('tab');
       Store.emit('selection');
     },
+    /* Sola/sağa taşı: kapalı sekmelerin üzerinden atlar */
     moveTab(id, dir) {
-      const tabs = Store.doc.tabs, i = tabs.findIndex((t) => t.id === id), j = i + dir;
-      if (i < 0 || j < 0 || j >= tabs.length) return;
-      Store.mutate(() => { [tabs[i], tabs[j]] = [tabs[j], tabs[i]]; });
+      const open = Store.doc.tabs.filter((t) => !t.closed), i = open.findIndex((t) => t.id === id), j = i + dir;
+      if (i < 0 || j < 0 || j >= open.length) return;
+      Actions.moveTabTo(id, open[j].id, dir > 0);
+    },
+    /* Sürükle-bırak: sekmeyi başka bir sekmenin önüne / arkasına taşı */
+    moveTabTo(id, targetId, after) {
+      const tabs = Store.doc.tabs, t = tabs.find((x) => x.id === id), target = tabs.find((x) => x.id === targetId);
+      if (!t || !target) return;
+      Store.mutate(() => { U.moveInArray(tabs, t, target, after); });
       renderTabs();
+    },
+    /* Karakterin diyalog sayfasına git: en son çalışılan sayfası (kapalıysa yeniden açılır), hiç yoksa yeni sayfa */
+    openCharacterPage(charId) {
+      const pages = App.Dialogue.pagesOf(Store.doc, charId);
+      if (App.CharactersUI.isOpen) App.CharactersUI.close();
+      if (isCompact()) closePanes();
+      if (!pages.length) return Actions.addCharacterPage(charId);
+      const t = pages.find((x) => x.id === lastPageOf[charId]) || pages.find((x) => !x.closed) || pages[0];
+      Store.setActiveTab(t.id);
+      return t;
+    },
+    /* Karakter sırası (palet ve karakter sayfası listesi) */
+    moveCharacter(id, targetId, after) {
+      const list = App.Dialogue.reg(Store.doc).characters, c = list.find((x) => x.id === id), target = list.find((x) => x.id === targetId);
+      if (c && target) Store.mutate(() => { U.moveInArray(list, c, target, after); });
     },
 
     toggleTheme() {
@@ -578,7 +617,7 @@
         if (!items.length) continue;
         const isCol = !q && collapsed[sec.id];
         const head = h('button', { class: 'pal-head' + (isCol ? ' collapsed' : ''), html: icon('chevron', 14) + `<span>${U.esc(sec.label)}</span><em>${items.length}</em>` });
-        head.addEventListener('click', () => { collapsed[sec.id] = !collapsed[sec.id]; try { localStorage.setItem('umlstudio.palette', JSON.stringify(collapsed)); } catch (e) { /* yok say */ } render(); });
+        head.addEventListener('click', () => { collapsed[sec.id] = !collapsed[sec.id]; savePalState(); render(); });
         const grid = h('div', { class: 'pal-grid' + (sec.id === 'uml' || sec.id === 'flow' || sec.id === 'dialogue' ? '' : ' list') });
         for (const it of items) {
           const el = h('div', { class: 'pal-item', draggable: 'true', title: $t('{label} — tıkla veya sürükle', { label: it.label }), tabindex: 0 },
@@ -591,32 +630,61 @@
         body.append(h('div', { class: 'pal-section' }, head, isCol ? null : grid));
       }
       if (App.Dialogue.isDialogueTab(Store.tab)) body.appendChild(characterSection(q));
-      if (!body.children.length) body.appendChild(h('div', { class: 'p-hint pad' }, $t('Sonuç yok')));
+      body.appendChild(pagesSection(q));
+      if (!body.querySelector('.pal-head')) body.appendChild(h('div', { class: 'p-hint pad' }, $t('Sonuç yok')));
     };
     search.addEventListener('input', render);
     render();
   }
 
-  /* Diyalog sekmesinde: karakter sayfasındaki karakterler, tuvale kişi kartı olarak sürüklenir */
+  const savePalState = () => { try { localStorage.setItem('umlstudio.palette', JSON.stringify(collapsed)); } catch (e) { /* yok say */ } };
+
+  /* Diyalog sekmesinde: karakter sayfasındaki karakterler. Çift tık: karakterin diyalog sayfası;
+     sürükle: tuvale kişi kartı olarak bırak ya da listede sırasını değiştir */
   function characterSection(q) {
     const all = App.Templates.characterItems();
     const items = all.filter((it) => !q || q.split(/\s+/).every((w) => norm(it.label + ' ' + it.alt + ' ' + $t('Karakterler')).includes(w)));
     if (q && !items.length) return h('div');
     const isCol = !q && collapsed.characters;
     const head = h('button', { class: 'pal-head' + (isCol ? ' collapsed' : ''), html: icon('chevron', 14) + `<span>${U.esc($t('Karakterler'))}</span><em>${all.length}</em>` });
-    head.addEventListener('click', () => { collapsed.characters = !collapsed.characters; try { localStorage.setItem('umlstudio.palette', JSON.stringify(collapsed)); } catch (e) { /* yok say */ } renderPalette(); });
+    head.addEventListener('click', () => { collapsed.characters = !collapsed.characters; savePalState(); renderPalette(); });
     if (isCol) return h('div', { class: 'pal-section' }, head);
-    const grid = h('div', { class: 'pal-grid list' });
+    const grid = h('div', { class: 'pal-grid list pal-scroll' });
     for (const it of items) {
-      const el = h('div', { class: 'pal-item', draggable: 'true', title: $t('{label}: kişi kartı olarak sahneye sürükleyin', { label: it.label }), tabindex: 0 },
+      const cid = it.id.slice(5);
+      const el = h('div', { class: 'pal-item', title: $t('{label} — çift tıkla: diyalog sayfası · sürükle: sahneye kişi kartı ya da sırala', { label: it.label }), tabindex: 0 },
         h('span', { class: 'pal-ico', html: UI.paletteIcon(it) }), h('span', { class: 'pal-label' }, it.label));
-      el.addEventListener('click', () => { if (isCompact()) closePanes(); Editor.insertItem(it); });
-      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') Editor.insertItem(it); });
-      el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-umlstudio', it.id); e.dataTransfer.effectAllowed = 'copy'; });
+      el.addEventListener('dblclick', () => Actions.openCharacterPage(cid));
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') Actions.openCharacterPage(cid); });
+      UI.sortable(el, cid, { kind: 'char', onMove: Actions.moveCharacter, onStart: (e) => e.dataTransfer.setData('application/x-umlstudio', it.id) });
       grid.appendChild(el);
     }
     const open = h('button', { class: 'link-btn pal-link', html: icon('users', 13) + `<span>${U.esc(all.length ? $t('Karakter sayfası') : $t('Karakter oluştur'))}</span>`, onclick: () => App.CharactersUI.open() });
     return h('div', { class: 'pal-section' }, head, grid, open);
+  }
+
+  /* Tüm sayfalar (sekmeler): kapatılan sayfalar burada kalır, tıklayınca kaldığı yerden açılır; sürükleyerek sıralanır */
+  function pagesSection(q) {
+    const all = Store.doc.tabs;
+    const items = all.filter((t) => !q || q.split(/\s+/).every((w) => norm(t.name + ' ' + $t('Sayfalar')).includes(w)));
+    if (q && !items.length) return h('div');
+    const nClosed = all.filter((t) => t.closed).length;
+    const isCol = !q && collapsed.pages;
+    const head = h('button', { class: 'pal-head' + (isCol ? ' collapsed' : ''), html: icon('chevron', 14) + `<span>${U.esc($t('Sayfalar'))}</span><em>${nClosed ? U.esc($t('{n} kapalı', { n: nClosed })) + ' · ' : ''}${all.length}</em>` });
+    head.addEventListener('click', () => { collapsed.pages = !collapsed.pages; savePalState(); renderPalette(); });
+    if (isCol) return h('div', { class: 'pal-section' }, head);
+    const list = h('div', { class: 'pal-pages pal-scroll' });
+    for (const t of items) {
+      const el = h('div', { class: 'pal-page' + (t.closed ? ' closed' : '') + (t.id === Store.doc.activeTab ? ' active' : ''), tabindex: 0,
+        title: t.closed ? $t('{name} — kapalı; tıkla: kaldığın yerden aç', { name: t.name }) : $t('{name} — tıkla: sayfaya git', { name: t.name }) },
+        tabDot(t), h('span', { class: 'pal-page-name' }, t.name), t.closed ? h('span', { class: 'pal-page-tag' }, $t('kapalı')) : null);
+      const go = () => { if (isCompact()) closePanes(); Store.setActiveTab(t.id); };
+      el.addEventListener('click', go);
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      UI.sortable(el, t.id, { kind: 'tab', onMove: Actions.moveTabTo });
+      list.appendChild(el);
+    }
+    return h('div', { class: 'pal-section' }, head, list);
   }
 
   function norm(s) {
@@ -624,34 +692,66 @@
   }
 
   /* ======================= SEKMELER ======================= */
+  const lastPageOf = {}; // karakter id -> en son açık olan sayfası
+  const tabEls = new Map(); // sekme id -> öğe (sürükleme başlarken öğe DOM'dan çıkmasın diye yeniden kullanılır)
+  const tabById = (id) => Store.doc.tabs.find((t) => t.id === id);
+
+  function dotInfo(t) {
+    const isDlgTab = App.Dialogue.isDialogueTab(t);
+    const isFlow = !isDlgTab && t.nodes.length && t.nodes.filter((n) => n.type !== 'class').length > t.nodes.length / 2;
+    const owner = isDlgTab ? App.Dialogue.tabOwner(Store.doc, t) : null;
+    return { cls: 'tab-dot' + (isDlgTab ? ' dlg' : isFlow ? ' flow' : '') + (owner ? ' owned' : ''), color: owner ? owner.color : '' };
+  }
+  function tabDot(t) {
+    const d = dotInfo(t);
+    return h('span', { class: d.cls, style: d.color ? { background: d.color } : null });
+  }
+
+  function tabEl(id) {
+    const el = h('div', { class: 'tab' });
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.tab-close, .tab-input')) return;
+      if (e.button === 0) Store.setActiveTab(id);
+      if (e.button === 1) { e.preventDefault(); Actions.closeTab(id); }
+    });
+    el.addEventListener('dblclick', (e) => { if (!e.target.closest('.tab-close, .tab-input') && tabById(id)) renameTabInline(el, tabById(id)); });
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const t = tabById(id);
+      if (!t) return;
+      UI.showMenu(e.clientX, e.clientY, [
+        { label: $t('Yeniden adlandır'), icon: 'edit', action: () => renameTabInline(el, t) },
+        { label: $t('Çoğalt'), icon: 'copy', action: () => Actions.duplicateTab(id) },
+        { label: $t('Sola taşı'), action: () => Actions.moveTab(id, -1) },
+        { label: $t('Sağa taşı'), action: () => Actions.moveTab(id, 1) },
+        App.Dialogue.isDialogueTab(t) ? { label: $t('Sayfanın karakteri'), icon: 'users', submenu: ownerMenu(t) } : null,
+        { sep: true },
+        { label: $t('Sekmeyi kapat'), icon: 'x', action: () => Actions.closeTab(id) },
+        { label: $t('Sekmeyi sil'), icon: 'trash', action: () => Actions.deleteTab(id) },
+      ]);
+    });
+    UI.sortable(el, id, { kind: 'tab', axis: 'x', onMove: Actions.moveTabTo });
+    return el;
+  }
+
   function renderTabs() {
     const bar = document.getElementById('tabList');
-    bar.replaceChildren();
-    for (const t of Store.doc.tabs) {
-      const isDlgTab = App.Dialogue.isDialogueTab(t);
-      const isFlow = !isDlgTab && t.nodes.length && t.nodes.filter((n) => n.type !== 'class').length > t.nodes.length / 2;
-      const owner = isDlgTab ? App.Dialogue.tabOwner(Store.doc, t) : null;
-      const title = $t('{name} — çift tıkla: yeniden adlandır', { name: t.name }) + (owner ? ' · ' + $t('Karakter sayfası: {name}', { name: owner.name }) : '');
-      const el = h('div', { class: 'tab' + (t.id === Store.doc.activeTab ? ' active' : ''), title },
-        h('span', { class: 'tab-dot' + (isDlgTab ? ' dlg' : isFlow ? ' flow' : '') + (owner ? ' owned' : ''), style: owner ? { background: owner.color } : null }),
-        h('span', { class: 'tab-name' }, t.name),
-        h('button', { class: 'tab-close', title: $t('Sekmeyi kapat'), html: icon('x', 12), onclick: (e) => { e.stopPropagation(); Actions.closeTab(t.id); } }));
-      el.addEventListener('pointerdown', (e) => { if (e.button === 0) Store.setActiveTab(t.id); if (e.button === 1) { e.preventDefault(); Actions.closeTab(t.id); } });
-      el.addEventListener('dblclick', () => renameTabInline(el, t));
-      el.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        UI.showMenu(e.clientX, e.clientY, [
-          { label: $t('Yeniden adlandır'), icon: 'edit', action: () => renameTabInline(el, t) },
-          { label: $t('Çoğalt'), icon: 'copy', action: () => Actions.duplicateTab(t.id) },
-          { label: $t('Sola taşı'), action: () => Actions.moveTab(t.id, -1) },
-          { label: $t('Sağa taşı'), action: () => Actions.moveTab(t.id, 1) },
-          isDlgTab ? { label: $t('Sayfanın karakteri'), icon: 'users', submenu: ownerMenu(t) } : null,
-          { sep: true },
-          { label: $t('Sekmeyi sil'), icon: 'trash', action: () => Actions.closeTab(t.id) },
-        ]);
-      });
-      bar.appendChild(el);
-    }
+    const open = Store.doc.tabs.filter((t) => !t.closed);
+    const els = open.map((t) => {
+      let el = tabEls.get(t.id);
+      if (!el) tabEls.set(t.id, (el = tabEl(t.id)));
+      const owner = App.Dialogue.isDialogueTab(t) ? App.Dialogue.tabOwner(Store.doc, t) : null;
+      el.className = 'tab' + (t.id === Store.doc.activeTab ? ' active' : '');
+      el.title = $t('{name} — çift tıkla: yeniden adlandır', { name: t.name }) + (owner ? ' · ' + $t('Karakter sayfası: {name}', { name: owner.name }) : '') + ' · ' + $t('sürükle: sırala');
+      if (!el.querySelector('.tab-input')) {
+        el.replaceChildren(tabDot(t), h('span', { class: 'tab-name' }, t.name),
+          h('button', { class: 'tab-close', title: $t('Sekmeyi kapat (silinmez, soldaki Sayfalar listesinden yeniden açılır)'), html: icon('x', 12), onclick: (e) => { e.stopPropagation(); Actions.closeTab(t.id); } }));
+      }
+      return el;
+    });
+    for (const id of [...tabEls.keys()]) if (!open.some((t) => t.id === id)) tabEls.delete(id);
+    // sıra değişmediyse öğelere dokunma (sürükleme başlarken öğe DOM'dan çıkmasın)
+    if (els.length !== bar.children.length || els.some((el, i) => bar.children[i] !== el)) bar.replaceChildren(...els);
     // etkin sekmeyi görünür yap (scrollIntoView sayfanın kendisini de kaydırabildiği için elle)
     const active = bar.querySelector('.tab.active');
     if (active) {
@@ -659,6 +759,21 @@
       if (l < bar.scrollLeft) bar.scrollLeft = l;
       else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth;
     }
+  }
+
+  /* Sekme çubuğu: fare tekerleğiyle yatay kaydırma, sürüklerken kenarlarda otomatik kaydırma */
+  function initTabBar() {
+    const bar = document.getElementById('tabList');
+    bar.addEventListener('wheel', (e) => {
+      if (bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      bar.scrollLeft += e.deltaY * (e.deltaMode === 1 ? 32 : 1);
+    }, { passive: false });
+    bar.addEventListener('dragover', (e) => {
+      const r = bar.getBoundingClientRect(), edge = 36;
+      if (e.clientX < r.left + edge) bar.scrollLeft -= 12;
+      else if (e.clientX > r.right - edge) bar.scrollLeft += 12;
+    });
   }
 
   function ownerMenu(t) {
@@ -679,6 +794,7 @@
     const finish = (ok) => {
       if (done) return; done = true;
       if (ok && inp.value.trim() && inp.value.trim() !== t.name) Store.mutate(() => { t.name = inp.value.trim(); });
+      inp.replaceWith(h('span', { class: 'tab-name' }, t.name));
       renderTabs();
     };
     inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
@@ -971,6 +1087,7 @@ public class Enemy : MonoBehaviour, IDamageable {
     Store.on('settings', updateStatus);
     Store.on('tab', () => {
       renderTabs(); updateStatus(); updateUndoButtons(); autosave();
+      if (Store.tab.owner) lastPageOf[Store.tab.owner] = Store.tab.id;
       // ilk kez açılan sekmeyi içeriğe sığdır
       const v = Store.tab.view;
       if (!v.fit) requestAnimationFrame(() => { Editor.fitView(); v.fit = true; });
@@ -979,11 +1096,13 @@ public class Enemy : MonoBehaviour, IDamageable {
     Store.on('saved', () => { updateTitle(); autosave(); });
     Store.on('docName', () => { updateTitle(); autosave(); });
     Store.on('tabsChanged', renderTabs);
-    // sekme türü değişince palet bölümleri değişir
+    initTabBar();
+    // sekme türü, karakterler ya da sayfalar değişince palet yeniden çizilir
     let palKind = null;
     const syncPalette = () => {
       const isD = App.Dialogue.isDialogueTab(Store.tab);
-      const k = isD + '|' + (isD ? App.Dialogue.reg(Store.doc).characters.map((c) => [c.id, c.name, c.color, c.role || '', (c.portrait || '').length].join(':')).join(',') : '');
+      const k = isD + '|' + (isD ? App.Dialogue.reg(Store.doc).characters.map((c) => [c.id, c.name, c.color, c.role || '', (c.portrait || '').length].join(':')).join(',') : '') +
+        '|' + Store.doc.activeTab + '|' + Store.doc.tabs.map((t) => { const d = dotInfo(t); return [t.id, t.name, t.closed ? 1 : 0, d.cls, d.color].join(':'); }).join(',');
       if (k !== palKind) { palKind = k; renderPalette(); }
       document.getElementById('btnChars').hidden = !isD;
     };
@@ -1000,6 +1119,7 @@ public class Enemy : MonoBehaviour, IDamageable {
         { label: $t('Akış şeması'), icon: 'layout', action: () => Actions.addTab(null, 'flow') },
         { label: $t('Oyun diyaloğu'), icon: 'chat', action: () => Actions.addTab(null, 'dialogue') },
         ...(App.Dialogue.reg(Store.doc).characters.length ? [{ label: $t('Karakter sayfası (diyalog)'), icon: 'users', submenu: App.Dialogue.reg(Store.doc).characters.map((c) => ({ label: c.name, action: () => Actions.addCharacterPage(c.id) })) }] : []),
+        ...(Store.doc.tabs.some((t) => t.closed) ? [{ sep: true }, { label: $t('Kapalı sayfalar'), icon: 'file', submenu: Store.doc.tabs.filter((t) => t.closed).map((t) => ({ label: t.name, action: () => Store.setActiveTab(t.id) })) }] : []),
       ]);
     });
     window.addEventListener('beforeunload', () => autosave.flush());

@@ -153,8 +153,12 @@ body.palette-hidden .palette, body.panel-hidden .panel { display: none; }
 
 /* ============ Sekmeler ============ */
 .tabbar { height: 38px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 6px; background: var(--bar); border-bottom: 1px solid var(--border); }
-.tab-list { display: flex; gap: 2px; overflow-x: auto; min-width: 0; scrollbar-width: none; }
-.tab-list::-webkit-scrollbar { display: none; }
+/* kaydırılabilir: tekerlek yatay kaydırır, ince kaydırma çubuğu üzerine gelince görünür */
+.tab-list { display: flex; gap: 2px; overflow-x: auto; min-width: 0; scrollbar-width: thin; scrollbar-color: transparent transparent; padding-bottom: 2px; }
+.tab-list:hover { scrollbar-color: var(--border2) transparent; }
+.tab-list::-webkit-scrollbar { height: 4px; }
+.tab-list::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
+.tab-list:hover::-webkit-scrollbar-thumb { background: var(--border2); }
 .tab {
   height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; border-radius: 7px; cursor: pointer;
   color: var(--text2); white-space: nowrap; flex: none; user-select: none; max-width: 220px;
@@ -168,6 +172,13 @@ body.palette-hidden .palette, body.panel-hidden .panel { display: none; }
 .tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
 .tab-close:hover { background: var(--hover); color: var(--text); }
 .tab-input { width: 140px; height: 22px; border: 1px solid var(--accent); border-radius: 4px; background: var(--input); padding: 0 5px; outline: none; }
+
+/* Sürükle-bırak ile sıralama (sekmeler, sayfalar, karakterler) */
+.dragging { opacity: .45; }
+.tab.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
+.tab.drop-after { box-shadow: inset -2px 0 0 var(--accent); }
+.pal-item.drop-before, .pal-page.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+.pal-item.drop-after, .pal-page.drop-after { box-shadow: 0 2px 0 var(--accent); }
 
 /* ============ Tuval ============ */
 .canvas-wrap {
@@ -657,6 +668,15 @@ button.dl-target:hover { background: var(--hover); color: var(--text); }
 .chars-btn { gap: 6px; padding: 0 9px; height: 28px; font-size: 12.5px; color: var(--text2); }
 .chars-btn[hidden] { display: none; }
 .pal-link { margin: 2px 0 8px 4px; }
+.pal-scroll { max-height: min(340px, 42vh); overflow-y: auto; overscroll-behavior: contain; }
+.pal-pages { display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px; }
+.pal-page { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; user-select: none; color: var(--text2); font-size: 12.5px; outline: none; }
+.pal-page:hover, .pal-page:focus-visible { background: var(--hover); color: var(--text); border-color: var(--border); }
+.pal-page.active { background: var(--accent-weak); color: var(--text); }
+.pal-page.closed { color: var(--text3); }
+.pal-page.closed .tab-dot { opacity: .55; }
+.pal-page-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-page-tag { flex: none; font-size: 10.5px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--border); color: var(--text3); }
 .dl-chars-link { align-self: flex-start; }
 .pl-ava img, .cp-ava img, .cp-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pl-ava { overflow: hidden; }
@@ -672,6 +692,9 @@ body.chars-open .chars-page { display: flex; }
 .cp-card { --who: #8e9bb0; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel2); text-align: left; cursor: pointer; color: var(--text); box-shadow: inset 3px 0 0 var(--who); }
 .cp-card:hover { border-color: var(--border2); background: var(--hover); }
 .cp-card.active { border-color: var(--who); background: color-mix(in srgb, var(--who) 14%, var(--panel2)); }
+.cp-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cp-card.drop-before { box-shadow: inset 3px 0 0 var(--who), 0 -3px 0 var(--accent); }
+.cp-card.drop-after { box-shadow: inset 3px 0 0 var(--who), 0 3px 0 var(--accent); }
 .cp-ava { --who: #8e9bb0; flex: none; width: 38px; height: 38px; border-radius: 10px; background: var(--who); color: #fff; font-weight: 700; font-size: 17px; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
 .cp-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cp-card-main b { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -709,6 +732,8 @@ body.chars-open .chars-page { display: flex; }
   .cp-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .cp-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--border); }
   .cp-card { flex: 0 0 220px; }
+  .cp-card.drop-before { box-shadow: inset 3px 0 0 var(--who), -3px 0 0 var(--accent); }
+  .cp-card.drop-after { box-shadow: inset 3px 0 0 var(--who), 3px 0 0 var(--accent); }
   .cp-edit { padding: 16px; }
   .cp-md { grid-template-columns: 1fr; }
   .cp-search { display: none; }

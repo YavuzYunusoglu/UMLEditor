@@ -690,6 +690,36 @@ test('Diyalog: karakter sayfaları ayrı dışa aktarılır', () => {
   for (const k of ['public string character;']) assert.ok(DL.csharpModel().includes(k) && DL.csharpUnityModel().includes(k), k);
 });
 
+/* ---------- Kapalı sekmeler ---------- */
+test('Kapalı sekme: belgede kalır, geri alma görüntüsüne girmez, geçince yeniden açılır', () => {
+  const { Model, Store } = App;
+  const d = Model.newDoc('X');
+  const b = Model.newTab('B'), c = Model.newTab('C');
+  d.tabs.push(b, c);
+  b.closed = true; c.closed = 'evet';
+  const n = Model.normalize(plain(d));
+  assert.strictEqual(n.tabs[1].closed, true);
+  assert.strictEqual(n.tabs[2].closed, undefined);
+  // etkin sekme kapalıysa açık bir sekme seçilir; hepsi kapalıysa etkin olan yeniden açılır
+  const all = plain(n); all.tabs.forEach((t) => { t.closed = true; }); all.activeTab = all.tabs[2].id;
+  const m = Model.normalize(all);
+  assert.strictEqual(m.activeTab, m.tabs[2].id); assert.ok(!m.tabs[2].closed); assert.ok(m.tabs[0].closed);
+  Store.load(n);
+  assert.ok(!Store.serialize().includes('"closed"'));
+  // kapatma geri alınmaz; geri almadan sonra kapalı kalır
+  Store.mutate(() => { Store.doc.tabs[0].name = 'A2'; });
+  Store.undo();
+  assert.strictEqual(Store.doc.tabs[1].closed, true);
+  Store.setActiveTab(Store.doc.tabs[1].id);
+  assert.ok(!Store.doc.tabs[1].closed);
+});
+test('Sıralama: moveInArray önüne / arkasına taşır', () => {
+  const mv = (arr, a, b, after) => { App.U.moveInArray(arr, a, b, after); return arr.join(''); };
+  assert.strictEqual(mv(['a', 'b', 'c', 'd'], 'a', 'c', true), 'bcad');
+  assert.strictEqual(mv(['a', 'b', 'c', 'd'], 'd', 'a', false), 'dabc');
+  assert.strictEqual(mv(['a', 'b', 'c', 'd'], 'b', 'c', false), 'abcd');
+});
+
 /* ---------- Çeviri (i18n) ---------- */
 const { collect } = require('./i18n-keys');
 const EN = App.I18n.DICTS.en;

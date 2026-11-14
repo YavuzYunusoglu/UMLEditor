@@ -134,11 +134,19 @@
       const shown = list.filter((c) => !q || (c.name + ' ' + c.id + ' ' + (c.role || '')).toLocaleLowerCase().includes(q));
       listEl.replaceChildren(...shown.map((c) => {
         const n = linesOf(c.id).length;
-        const card = h('button', { class: 'cp-card' + (c.id === selId ? ' active' : ''), style: { '--who': c.color } },
+        // düğme değil div: Firefox düğmeleri sürüklemiyor
+        const card = h('div', { class: 'cp-card' + (c.id === selId ? ' active' : ''), role: 'button', tabindex: 0, style: { '--who': c.color },
+          title: $t('Çift tıkla: diyalog sayfası · sürükle: sırala') },
           avatarEl(c),
           h('span', { class: 'cp-card-main' }, h('b', null, c.name), h('span', null, c.role ? Md.strip(c.role, true) : '@' + c.id)),
           h('span', { class: 'cp-card-n' }, $t('{n} replik', { n })));
-        card.addEventListener('click', () => { selId = c.id; render(); });
+        // ilk tık kartı seçip listeyi yeniden çizer; ikinci tık yeni karta düşer, bu yüzden dblclick yerine e.detail
+        card.addEventListener('click', (e) => {
+          if (e.detail === 2) { App.Actions.openCharacterPage(c.id); return; }
+          if (selId !== c.id) { selId = c.id; render(); }
+        });
+        card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selId = c.id; render(); } });
+        UI.sortable(card, c.id, { kind: 'char', axis: window.matchMedia('(max-width: 860px)').matches ? 'x' : 'y', onMove: (a, b, after) => { App.Actions.moveCharacter(a, b, after); render(); } });
         return card;
       }));
       if (!list.length) listEl.appendChild(h('div', { class: 'cp-empty' }, h('p', null, $t('Henüz karakter yok.')), h('button', { class: 'btn primary', onclick: create }, $t('İlk karakteri oluştur'))));

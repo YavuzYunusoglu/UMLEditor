@@ -301,5 +301,44 @@
     }
   }
 
-  App.UI = { icon, iconEl, paletteIcon, showMenu, closeMenus, dropdown, modal, topModal, confirm, prompt, toast, highlightCS, copyText };
+  /* Sürükle-bırak ile sıralama (HTML5 DnD). Aynı türdeki öğeler (kind) farklı listeler arasında da
+     sıralanabilir: onMove(fromKey, toKey, after) çağrılır. onStart ek veri koyabilir (ör. tuvale bırakma). */
+  const SORT_MIME = 'application/x-umlstudio-sort-';
+  let sortDrag = null;
+  function sortable(el, key, opts) {
+    const mime = SORT_MIME + opts.kind;
+    const horiz = opts.axis === 'x';
+    const clear = () => el.classList.remove('drop-before', 'drop-after');
+    const isAfter = (e) => {
+      const r = el.getBoundingClientRect();
+      return horiz ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
+    };
+    el.draggable = true;
+    el.addEventListener('dragstart', (e) => {
+      sortDrag = { kind: opts.kind, key };
+      e.dataTransfer.setData(mime, key);
+      e.dataTransfer.effectAllowed = opts.onStart ? 'copyMove' : 'move';
+      if (opts.onStart) opts.onStart(e);
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => { sortDrag = null; el.classList.remove('dragging'); });
+    el.addEventListener('dragover', (e) => {
+      if (!Array.from(e.dataTransfer.types || []).includes(mime)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const after = isAfter(e);
+      el.classList.toggle('drop-after', after);
+      el.classList.toggle('drop-before', !after);
+    });
+    el.addEventListener('dragleave', (e) => { if (!el.contains(e.relatedTarget)) clear(); });
+    el.addEventListener('drop', (e) => {
+      if (!Array.from(e.dataTransfer.types || []).includes(mime)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      clear();
+      const from = e.dataTransfer.getData(mime) || (sortDrag && sortDrag.key);
+      if (from && from !== key) opts.onMove(from, key, isAfter(e));
+    });
+  }
+  App.UI = { icon, iconEl, paletteIcon, showMenu, closeMenus, dropdown, modal, topModal, confirm, prompt, toast, highlightCS, copyText, sortable };
 })(typeof window !== 'undefined' ? window : globalThis);
